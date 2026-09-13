@@ -123,6 +123,85 @@ User-Provided Logs:
 """
 
 
+DESTRUCTIVE_COMMAND_KEYWORDS = [
+    "terminate-", "delete-", " rm ", " rb ", "drop-", "purge-",
+    "destroy-", "modify-", "update-", "create-", "put-", "stop-",
+    "reboot-", "deregister-", "disassociate-", "detach-", "revoke-",
+    "authorize-security-group-ingress", "authorize-security-group-egress"
+]
+
+
+def sanitize_cli_commands(commands):
+    """Filter out destructive, modifying, or state-changing commands to ensure only safe read-only diagnostics remain."""
+    safe_commands = []
+    if not isinstance(commands, list):
+        return []
+    for item in commands:
+        if isinstance(item, dict):
+            cmd_str = item.get("command", "")
+            is_destructive = any(kw in cmd_str.lower() for kw in DESTRUCTIVE_COMMAND_KEYWORDS)
+            if is_destructive:
+                continue
+            item["risk"] = "READ_ONLY"
+            safe_commands.append(item)
+        elif isinstance(item, str):
+            is_destructive = any(kw in item.lower() for kw in DESTRUCTIVE_COMMAND_KEYWORDS)
+            if not is_destructive:
+                safe_commands.append({
+                    "command": item,
+                    "description": "Diagnostic check",
+                    "purpose": "Inspects AWS resource status",
+                    "risk": "READ_ONLY"
+                })
+    return safe_commands
+
+
+def build_cli_prompt(service, incident, resource_name, region):
+    res_placeholder = resource_name.strip() if resource_name and resource_name.strip() else ""
+    target_region = region.strip() if region and region.strip() else "ap-south-1"
+
+    if res_placeholder:
+        resource_instruction = f"Target resource identifier specified by user: '{res_placeholder}'. Use this exact identifier in the relevant parameter flags."
+    else:
+        resource_instruction = (
+            "No specific resource name was provided. DO NOT invent an account ID, ARN, or fake identifier. "
+            "Use clear uppercase placeholders such as FUNCTION_NAME, INSTANCE_ID, BUCKET_NAME, API_ID, ROLE_NAME, LOG_GROUP, DB_INSTANCE_ID, or SECURITY_GROUP_ID."
+        )
+
+    return f"""
+You are an expert AWS Solutions Architect and AWS CLI diagnostic specialist.
+
+Generate safe, read-only AWS CLI diagnostic commands to help an engineer troubleshoot and investigate the following AWS issue.
+
+AWS Service: {service}
+Diagnostic Goal / Incident: {incident}
+Target Region: {target_region}
+{resource_instruction}
+
+STRICT SAFETY RULES:
+1. ONLY generate READ-ONLY diagnostic commands (such as describe-*, get-*, list-*, head-*, etc.).
+2. NEVER generate destructive, modifying, or state-changing commands (e.g., delete-*, terminate-*, rm, rb, modify-*, update-*, create-*, put-*, reboot-*, stop-*).
+3. Do not invent AWS account numbers, arbitrary ARNs, or secret keys.
+4. Include the '--region {target_region}' flag where applicable.
+
+Return ONLY valid JSON matching this exact structure:
+
+{{
+  "service": "{service}",
+  "summary": "Short explanation of the diagnostic strategy and what these commands will investigate",
+  "commands": [
+    {{
+      "command": "aws <service> <subcommand> [flags]",
+      "description": "What this specific command checks",
+      "purpose": "Why running this check is useful for investigating the stated issue",
+      "risk": "READ_ONLY"
+    }}
+  ],
+  "safety_note": "These commands are intended for read-only diagnostics. Review commands before running them in your AWS environment."
+}}
+"""
+
+
 def is_options_request(event):
     """Check if the incoming request is an HTTP OPTIONS preflight request."""
     if not isinstance(event, dict):
@@ -219,6 +298,48 @@ def lambda_handler(event, context):
             prompt = build_log_prompt(logs)
             max_tokens = 2048
 
+        # Handle AWS CLI Diagnostic Command Generation
+        elif action == "generate_cli":
+            service = body.get("service", "")
+            if not isinstance(service, str) or not service.strip():
+                return response(
+                    400,
+                    {"error": "The 'service' field is required when action is 'generate_cli'."}
+                )
+            service = service.strip()
+            if len(service) > 100:
+                return response(
+                    400,
+                    {"error": "The 'service' field is too long. Maximum is 100 characters."}
+                )
+
+            incident = body.get("incident", "")
+            if not isinstance(incident, str) or not incident.strip():
+                return response(
+                    400,
+                    {"error": "The 'incident' field is required when action is 'generate_cli'."}
+                )
+            incident = incident.strip()
+            if len(incident) > 5000:
+                return response(
+                    400,
+                    {"error": "Incident description is too long. Maximum is 5,000 characters."}
+                )
+
+            resource_name = body.get("resource_name", "")
+            if not isinstance(resource_name, str):
+                resource_name = ""
+            resource_name = resource_name.strip()[:200]
+
+            region = body.get("region", "")
+            if not isinstance(region, str):
+                region = "ap-south-1"
+            region = region.strip()[:50] or "ap-south-1"
+
+            print(f"Executing generate_cli: service={service}, payload_length={len(incident)} chars")
+            prompt = build_cli_prompt(service, incident, resource_name, region)
+            max_tokens = 2048
+
         # Handle Standard Incident Analysis (Default / Legacy)
         else:
             incident = body.get("incident", "")
@@ -265,6 +386,15 @@ def lambda_handler(event, context):
 
         text = result["output"]["message"]["content"][0]["text"]
         analysis = extract_json(text)
+
+        # Post-process CLI commands to enforce safety guardrails
+        if action == "generate_cli" and isinstance(analysis, dict):
+            raw_commands = analysis.get("commands", [])
+            analysis["commands"] = sanitize_cli_commands(raw_commands)
+            if not analysis.get("service"):
+                analysis["service"] = service
+            if not analysis.get("safety_note"):
+                analysis["safety_note"] = "These commands are intended for read-only diagnostics. Review commands before running them in your AWS environment."
 
         return response(
             200,

@@ -65,6 +65,12 @@ export default function Navbar({ onNavigate, currentRoute = '/' }) {
               <span className="navbar-history-badge">{historyCount}</span>
             ) : null}
           </button>
+          <button 
+            className={`nav-link ${currentRoute === '/cli-generator' ? 'active' : ''}`} 
+            onClick={(e) => handleNav(e, '/cli-generator')}
+          >
+            CLI Generator
+          </button>
         </nav>
 
         <div className="navbar-actions">

@@ -277,6 +277,173 @@ class TestLambdaBackend(unittest.TestCase):
         body = json.loads(res["body"])
         self.assertEqual(body["error"], "Unable to analyze the incident.")
 
+    # -------------------------------------------------------------
+    # CLI Diagnostic Generator Tests
+    # -------------------------------------------------------------
+
+    @patch.object(lambda_function, "bedrock")
+    def test_generate_cli_success(self, mock_bedrock):
+        """Valid CLI command generation returns 200 with structured commands and safety note."""
+        mock_cli_response = {
+            "service": "Lambda",
+            "summary": "Commands to inspect Lambda function configuration, runtime logs, and execution limits.",
+            "commands": [
+                {
+                    "command": "aws lambda get-function-configuration --function-name my-function --region ap-south-1",
+                    "description": "Checks function timeout, memory, and runtime settings",
+                    "purpose": "Identify if function timed out due to configured limits",
+                    "risk": "READ_ONLY"
+                },
+                {
+                    "command": "aws logs describe-log-streams --log-group-name /aws/lambda/my-function --order-by LastEventTime --descending --region ap-south-1",
+                    "description": "Lists latest execution log streams",
+                    "purpose": "Locate most recent invocation logs for timeout analysis",
+                    "risk": "READ_ONLY"
+                }
+            ],
+            "safety_note": "These commands are intended for read-only diagnostics."
+        }
+        mock_bedrock.converse.return_value = {
+            "output": {
+                "message": {
+                    "content": [
+                        {"text": json.dumps(mock_cli_response)}
+                    ]
+                }
+            }
+        }
+        event = {
+            "body": json.dumps({
+                "action": "generate_cli",
+                "service": "Lambda",
+                "incident": "Lambda function is timing out after 30 seconds",
+                "resource_name": "my-function",
+                "region": "ap-south-1"
+            })
+        }
+        res = lambda_function.lambda_handler(event, None)
+        self.assertEqual(res["statusCode"], 200)
+        body = json.loads(res["body"])
+        self.assertEqual(body["service"], "Lambda")
+        self.assertEqual(len(body["commands"]), 2)
+        self.assertEqual(body["commands"][0]["risk"], "READ_ONLY")
+        self.assertIn("my-function", body["commands"][0]["command"])
+        self.assertIn("safety_note", body)
+
+    def test_generate_cli_missing_service(self):
+        """Action generate_cli without service returns 400."""
+        event = {
+            "body": json.dumps({
+                "action": "generate_cli",
+                "incident": "Lambda function is timing out"
+            })
+        }
+        res = lambda_function.lambda_handler(event, None)
+        self.assertEqual(res["statusCode"], 400)
+        body = json.loads(res["body"])
+        self.assertIn("The 'service' field is required", body["error"])
+
+    def test_generate_cli_empty_incident(self):
+        """Action generate_cli without incident returns 400."""
+        event = {
+            "body": json.dumps({
+                "action": "generate_cli",
+                "service": "EC2",
+                "incident": "   "
+            })
+        }
+        res = lambda_function.lambda_handler(event, None)
+        self.assertEqual(res["statusCode"], 400)
+        body = json.loads(res["body"])
+        self.assertIn("The 'incident' field is required", body["error"])
+
+    def test_generate_cli_oversized_incident(self):
+        """Incident description exceeding 5,000 characters returns 400."""
+        event = {
+            "body": json.dumps({
+                "action": "generate_cli",
+                "service": "S3",
+                "incident": "A" * 5001
+            })
+        }
+        res = lambda_function.lambda_handler(event, None)
+        self.assertEqual(res["statusCode"], 400)
+        body = json.loads(res["body"])
+        self.assertIn("Incident description is too long", body["error"])
+
+    def test_sanitize_cli_commands_strips_destructive(self):
+        """Destructive commands such as terminate, delete, rm are stripped by sanitizer."""
+        raw_commands = [
+            {
+                "command": "aws ec2 describe-instances --instance-ids i-1234567890abcdef0",
+                "description": "Safe check",
+                "purpose": "Inspect state"
+            },
+            {
+                "command": "aws ec2 terminate-instances --instance-ids i-1234567890abcdef0",
+                "description": "Destructive command",
+                "purpose": "Kill instance"
+            },
+            {
+                "command": "aws s3 rm s3://my-bucket/data --recursive",
+                "description": "Destructive command",
+                "purpose": "Delete files"
+            },
+            {
+                "command": "aws s3api head-bucket --bucket my-bucket",
+                "description": "Safe check",
+                "purpose": "Check bucket existence"
+            }
+        ]
+        sanitized = lambda_function.sanitize_cli_commands(raw_commands)
+        self.assertEqual(len(sanitized), 2)
+        commands_text = [item["command"] for item in sanitized]
+        self.assertIn("aws ec2 describe-instances --instance-ids i-1234567890abcdef0", commands_text)
+        self.assertIn("aws s3api head-bucket --bucket my-bucket", commands_text)
+        self.assertNotIn("terminate-instances", "".join(commands_text))
+        self.assertNotIn("rm s3://", "".join(commands_text))
+        for item in sanitized:
+            self.assertEqual(item["risk"], "READ_ONLY")
+
+    @patch.object(lambda_function, "bedrock")
+    def test_generate_cli_defaults_optional_fields(self, mock_bedrock):
+        """Missing resource_name and region default safely without error."""
+        mock_bedrock.converse.return_value = {
+            "output": {
+                "message": {
+                    "content": [
+                        {
+                            "text": json.dumps({
+                                "service": "RDS",
+                                "summary": "Diagnostic checks for RDS connection refusal.",
+                                "commands": [
+                                    {
+                                        "command": "aws rds describe-db-instances --db-instance-identifier DB_INSTANCE_ID --region ap-south-1",
+                                        "description": "Check instance status and endpoint",
+                                        "purpose": "Verify database availability",
+                                        "risk": "READ_ONLY"
+                                    }
+                                ]
+                            })
+                        }
+                    ]
+                }
+            }
+        }
+        event = {
+            "body": json.dumps({
+                "action": "generate_cli",
+                "service": "RDS",
+                "incident": "Connection refused to database on port 5432"
+            })
+        }
+        res = lambda_function.lambda_handler(event, None)
+        self.assertEqual(res["statusCode"], 200)
+        body = json.loads(res["body"])
+        self.assertEqual(body["service"], "RDS")
+        self.assertIn("DB_INSTANCE_ID", body["commands"][0]["command"])
+        self.assertIn("safety_note", body)
+
 
 if __name__ == "__main__":
     unittest.main()

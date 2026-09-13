@@ -35,6 +35,13 @@ AI-powered serverless DevOps troubleshooting assistant built with React and Vite
   - Individual item deletion and bulk clear with confirmation dialog
   - Export capabilities for incident post-mortems
 
+- **CLI Diagnostic Generator (`/cli-generator`)**:
+  - Service-tailored diagnostic query generator for 9 major AWS services (Lambda, API Gateway, S3, EC2, IAM, RDS, CloudFormation, CloudWatch, VPC / Networking)
+  - Safe, read-only commands (`describe-*`, `get-*`, `list-*`, `head-*`) with safety guardrails filtering destructive operations
+  - Dynamic placeholder substitution (`FUNCTION_NAME`, `INSTANCE_ID`, etc.) or user-specified resource identifiers
+  - Monospace code boxes with individual `Copy`, global `Copy All Commands`, and text file download (`aws-cli-diagnostics-{service}.txt`)
+  - Cross-integration button in both Incident and Log Analyzers ("Generate CLI Diagnostics")
+
 ## Architecture
 
 ```text

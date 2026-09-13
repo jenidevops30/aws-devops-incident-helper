@@ -23,6 +23,7 @@ The goal is to help developers quickly understand:
 
 - **Incident Description Analyzer**: Large textarea for pasting error messages, logs, or incident descriptions (up to 10,000 chars)
 - **CloudWatch Log Analyzer**: Dedicated log parsing engine for pasting raw multi-line CloudWatch logs (up to 20,000 chars) with verbatim log evidence extraction
+- **CLI Diagnostic Generator (`/cli-generator`)**: Safe, read-only AWS CLI command generator with copy and text runbook download capabilities
 - **Preset Scenarios**: Ready-to-use presets for Lambda timeouts, API Gateway 5xx, RDS connection errors, and S3 AccessDenied
 - **Incident History**: Client-side persistent storage with real-time keyword search, severity filtering, detailed inspection modal, and Slack/Jira markdown export
 - **Related Saved Incidents**: Automatically detects and surfaces relevant prior incidents when analyzing new issues
@@ -30,6 +31,7 @@ The goal is to help developers quickly understand:
 - **Structured Response**: 
   - Standard Incidents: Severity, summary, likely causes, recommended checks, troubleshooting steps, remediation, and AWS CLI commands
   - CloudWatch Logs: Adds error pattern breakdown, verbatim log quotes with significance, and long-term prevention strategies
+  - CLI Diagnostics: Read-only command playbook, verification descriptions, investigative purpose, and safety warnings
 - **Responsive UI**: Clean, AWS-inspired console aesthetic with intuitive tabs, code copy buttons, and responsive design
 - **Security & Privacy**: Zero server-side log persistence, zero direct AWS account access claims, and $0-at-rest client-side architecture
 
@@ -45,14 +47,15 @@ Amazon API Gateway (HTTP API - POST /analyze)
     ▼
 AWS Lambda (Python 3.11, ap-south-1)
     │  Privacy: Logs metadata only, never raw customer logs
+    │  Safety: Dual-layer read-only command sanitizer
     ▼
 Amazon Bedrock (Nova Lite via APAC Inference Profile)
     │
     ▼
-Structured Troubleshooting & Evidence JSON
+Structured Troubleshooting & CLI Runbook JSON
     │
     ▼
-Browser (Interactive Log & Incident Explorer)
+Browser (Interactive Log, Incident & CLI Playbook Explorer)
 ```
 
 ### AWS Services Used
@@ -125,6 +128,38 @@ Browser (Interactive Log & Incident Explorer)
   "remediation": ["..."],
   "aws_commands": ["aws lambda update-function-configuration ..."],
   "prevention": ["..."]
+}
+```
+
+### 3. Generate CLI Diagnostics
+
+**Endpoint:** `POST /analyze`
+
+**Request:**
+```json
+{
+  "action": "generate_cli",
+  "service": "Lambda",
+  "incident": "Lambda function is timing out after 30 seconds",
+  "resource_name": "payment-processor",
+  "region": "ap-south-1"
+}
+```
+
+**Response:**
+```json
+{
+  "service": "Lambda",
+  "summary": "Retrieves configuration and invocation metrics for payment-processor to isolate timeout triggers.",
+  "commands": [
+    {
+      "command": "aws lambda get-function-configuration --function-name payment-processor --region ap-south-1",
+      "description": "Retrieves current function timeout, memory size, and environment variables.",
+      "purpose": "Verifies whether configured timeout is too low for downstream latency.",
+      "risk": "READ_ONLY"
+    }
+  ],
+  "safety_note": "These commands are intended for read-only diagnostics. Review commands before running them in your AWS environment."
 }
 ```
 

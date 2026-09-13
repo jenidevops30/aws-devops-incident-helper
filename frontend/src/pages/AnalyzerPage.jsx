@@ -220,6 +220,7 @@ export default function AnalyzerPage({ incidentText, onIncidentTextChange, onNav
                 error={error}
                 onRetry={() => handleAnalyzeIncident(incidentText)}
                 rawIncident={incidentText}
+                onNavigate={onNavigate}
               />
             </>
           ) : (
@@ -335,6 +336,7 @@ export default function AnalyzerPage({ incidentText, onIncidentTextChange, onNav
                 error={error}
                 onRetry={handleAnalyzeLogs}
                 rawLogs={logText}
+                onNavigate={onNavigate}
               />
             </div>
           )}

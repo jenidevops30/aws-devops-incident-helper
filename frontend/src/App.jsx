@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import LandingPage from './pages/LandingPage';
 import AnalyzerPage from './pages/AnalyzerPage';
 import HistoryPage from './pages/HistoryPage';
+import CliGeneratorPage from './pages/CliGeneratorPage';
 
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState(() => {
@@ -9,12 +10,14 @@ export default function App() {
       const path = window.location.pathname;
       if (path === '/analyze') return '/analyze';
       if (path === '/history') return '/history';
+      if (path === '/cli-generator') return '/cli-generator';
       return '/';
     }
     return '/';
   });
 
   const [incidentText, setIncidentText] = useState('');
+  const [cliInitialState, setCliInitialState] = useState(null);
 
   // Synchronize route with browser history (back/forward navigation)
   useEffect(() => {
@@ -22,6 +25,7 @@ export default function App() {
       const path = window.location.pathname;
       if (path === '/analyze') setCurrentRoute('/analyze');
       else if (path === '/history') setCurrentRoute('/history');
+      else if (path === '/cli-generator') setCurrentRoute('/cli-generator');
       else setCurrentRoute('/');
     };
 
@@ -29,7 +33,12 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const navigate = (route, targetSection) => {
+  const navigate = (route, targetSection, extraState = null) => {
+    if (extraState) {
+      if (route === '/cli-generator') {
+        setCliInitialState(extraState);
+      }
+    }
     if (window.location.pathname !== route) {
       window.history.pushState({}, '', route);
     }
@@ -67,6 +76,11 @@ export default function App() {
       ) : currentRoute === '/history' ? (
         <HistoryPage
           onNavigate={navigate}
+        />
+      ) : currentRoute === '/cli-generator' ? (
+        <CliGeneratorPage
+          onNavigate={navigate}
+          initialFormState={cliInitialState}
         />
       ) : (
         <LandingPage

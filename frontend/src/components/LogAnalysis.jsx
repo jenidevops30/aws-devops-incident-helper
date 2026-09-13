@@ -4,9 +4,34 @@ import AnalysisSection from './AnalysisSection';
 import CommandList from './CommandList';
 import { saveIncident } from '../utils/historyStorage';
 
-export default function LogAnalysis({ analysis, isLoading, error, onRetry, rawLogs }) {
+export default function LogAnalysis({ analysis, isLoading, error, onRetry, rawLogs, onNavigate }) {
   const [copiedSlack, setCopiedSlack] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const inferService = (text = '') => {
+    const lower = text.toLowerCase();
+    if (lower.includes('lambda')) return 'Lambda';
+    if (lower.includes('api gateway') || lower.includes('apigateway') || lower.includes('502') || lower.includes('504')) return 'API Gateway';
+    if (lower.includes('s3') || lower.includes('bucket')) return 'S3';
+    if (lower.includes('ec2') || lower.includes('instance')) return 'EC2';
+    if (lower.includes('rds') || lower.includes('database') || lower.includes('postgres') || lower.includes('mysql')) return 'RDS';
+    if (lower.includes('iam') || lower.includes('role') || lower.includes('policy') || lower.includes('sts')) return 'IAM';
+    if (lower.includes('cloudformation') || lower.includes('stack')) return 'CloudFormation';
+    if (lower.includes('cloudwatch') || lower.includes('log')) return 'CloudWatch';
+    if (lower.includes('vpc') || lower.includes('subnet') || lower.includes('nat gateway')) return 'VPC / Networking';
+    return 'CloudWatch';
+  };
+
+  const handleOpenCliGenerator = () => {
+    if (onNavigate) {
+      const detectedService = inferService(`${analysis?.error_pattern || ''} ${analysis?.summary || ''}`);
+      onNavigate('/cli-generator', null, {
+        service: detectedService,
+        incident: analysis?.error_pattern || analysis?.summary || 'Investigate CloudWatch logs error',
+        region: 'ap-south-1',
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -138,6 +163,17 @@ ${preventionText || 'None.'}
         </div>
 
         <div className="analysis-actions-toolbar">
+          {onNavigate ? (
+            <button
+              className="btn btn-sm btn-secondary"
+              onClick={handleOpenCliGenerator}
+              title="Generate targeted AWS CLI diagnostic commands for this incident"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>terminal</span>
+              <span>Generate CLI Diagnostics</span>
+            </button>
+          ) : null}
+
           <button
             className={`btn btn-sm ${saved ? 'btn-success' : 'btn-secondary'}`}
             onClick={handleSave}

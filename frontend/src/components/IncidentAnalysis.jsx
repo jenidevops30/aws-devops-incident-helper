@@ -4,9 +4,34 @@ import AnalysisSection from './AnalysisSection';
 import CommandList from './CommandList';
 import { saveIncident } from '../utils/historyStorage';
 
-export default function IncidentAnalysis({ analysis, isLoading, error, onRetry, rawIncident }) {
+export default function IncidentAnalysis({ analysis, isLoading, error, onRetry, rawIncident, onNavigate }) {
   const [copiedSlack, setCopiedSlack] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const inferService = (text = '') => {
+    const lower = text.toLowerCase();
+    if (lower.includes('lambda')) return 'Lambda';
+    if (lower.includes('api gateway') || lower.includes('apigateway') || lower.includes('502') || lower.includes('504')) return 'API Gateway';
+    if (lower.includes('s3') || lower.includes('bucket')) return 'S3';
+    if (lower.includes('ec2') || lower.includes('instance')) return 'EC2';
+    if (lower.includes('rds') || lower.includes('database') || lower.includes('postgres') || lower.includes('mysql')) return 'RDS';
+    if (lower.includes('iam') || lower.includes('role') || lower.includes('policy') || lower.includes('sts')) return 'IAM';
+    if (lower.includes('cloudformation') || lower.includes('stack')) return 'CloudFormation';
+    if (lower.includes('cloudwatch') || lower.includes('log')) return 'CloudWatch';
+    if (lower.includes('vpc') || lower.includes('subnet') || lower.includes('nat gateway')) return 'VPC / Networking';
+    return 'Lambda';
+  };
+
+  const handleOpenCliGenerator = () => {
+    if (onNavigate) {
+      const detectedService = inferService(`${rawIncident || ''} ${analysis?.summary || ''}`);
+      onNavigate('/cli-generator', null, {
+        service: detectedService,
+        incident: rawIncident || analysis?.summary || '',
+        region: 'ap-south-1',
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -29,30 +54,30 @@ export default function IncidentAnalysis({ analysis, isLoading, error, onRetry, 
         <div className="error-icon-badge" aria-hidden="true">
           <span className="material-symbols-outlined">error</span>
         </div>
-        <h3 className="error-title">Unable to analyze incident</h3>
+        <h3 className="error-title">Incident Analysis Failed</h3>
         <p className="error-desc">
-          The analysis service could not be reached. Check your API configuration and try again.
+          Unable to generate troubleshooting recommendations. Please verify your connection and try again.
         </p>
-        <button 
-          className="btn btn-primary"
-          onClick={onRetry}
-        >
-          Try Again
-        </button>
+        {onRetry ? (
+          <button className="btn btn-secondary retry-btn" onClick={onRetry}>
+            <span className="material-symbols-outlined">refresh</span>
+            <span>Retry Analysis</span>
+          </button>
+        ) : null}
       </div>
     );
   }
 
   if (!analysis) {
     return (
-      <div className="empty-state-card">
-        <div className="empty-state-icon" aria-hidden="true">
-          <span className="material-symbols-outlined">analytics</span>
-        </div>
-        <div className="empty-state-content">
-          <h3 className="empty-state-title">Awaiting Incident Description</h3>
+      <div className="empty-analysis-card">
+        <div className="empty-analysis-inner">
+          <div className="empty-state-icon" aria-hidden="true">
+            <span className="material-symbols-outlined">description</span>
+          </div>
+          <h3 className="empty-state-title">Awaiting Incident Input</h3>
           <p className="empty-state-text">
-            Paste your error logs, describe your AWS issue, or select a quick-fill template above to generate a comprehensive diagnostic report.
+            Enter an AWS incident description or error message above, or choose an example scenario to generate a structured diagnostic report.
           </p>
         </div>
       </div>
@@ -60,7 +85,7 @@ export default function IncidentAnalysis({ analysis, isLoading, error, onRetry, 
   }
 
   const handleSave = () => {
-    const title = analysis.summary?.slice(0, 60) || 'AWS Incident Investigation';
+    const title = rawIncident ? rawIncident.slice(0, 60) : 'AWS Incident';
     const result = saveIncident({
       title,
       type: 'incident',
@@ -128,6 +153,17 @@ ${commandsText || 'None generated.'}
         </div>
 
         <div className="analysis-actions-toolbar">
+          {onNavigate ? (
+            <button
+              className="btn btn-sm btn-secondary"
+              onClick={handleOpenCliGenerator}
+              title="Generate targeted AWS CLI diagnostic commands for this incident"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>terminal</span>
+              <span>Generate CLI Diagnostics</span>
+            </button>
+          ) : null}
+
           <button
             className={`btn btn-sm ${saved ? 'btn-success' : 'btn-secondary'}`}
             onClick={handleSave}
