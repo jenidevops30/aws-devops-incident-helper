@@ -1,6 +1,8 @@
 # Dependencies
 node_modules/
 frontend/node_modules/
+__pycache__/
+*.py[cod]
 
 # Build outputs
 frontend/dist/
@@ -34,3 +36,13 @@ coverage/
 *.pem
 *.key
 *.crt
+.history/
+.playwright-mcp/
+scratch/
+.kiro/
+frontend/screenshots/
+
+# Internal/debug files — not needed in repo
+screenshots/
+stitch_designs/
+CLAUDE.md

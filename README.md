@@ -245,13 +245,23 @@ npm run build
 
 ## 📸 Screenshots
 
-*Screenshots to be added:*
-1. Application homepage
-2. User entering an incident
-3. AI-generated incident analysis
-4. AWS Lambda configuration
-5. API Gateway endpoint
-6. Architecture diagram
+1. **Application Homepage**
+   ![Application Homepage](screenshots/01-application-homepage.png)
+
+2. **User Entering an Incident**
+   ![User Entering an Incident](screenshots/02-user-entering-incident.png)
+
+3. **AI-Generated Incident Analysis**
+   ![AI-Generated Incident Analysis](screenshots/03-ai-generated-incident-analysis.png)
+
+4. **AWS Lambda Configuration**
+   ![AWS Lambda Configuration](screenshots/04-aws-lambda-configuration.png)
+
+5. **API Gateway Endpoint**
+   ![API Gateway Endpoint](screenshots/05-api-gateway-endpoint.png)
+
+6. **AWS Architecture Diagram**
+   ![Architecture Diagram](screenshots/06-architecture-diagram.png)
 
 ## 📚 What I Learned
 
