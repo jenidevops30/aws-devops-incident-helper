@@ -5,44 +5,54 @@ AI-powered serverless DevOps troubleshooting assistant built with React and Vite
 ## Features
 
 - **Product Landing Page (`/`)**:
-  - AWS-styled navigation and hero with live product illustration
+  - AWS-styled navigation with active tab states and live Incident History counter
+  - Hero with live product illustration and quick-start actions
   - Three-step incident troubleshooting lifecycle ("How It Works")
   - Enterprise feature capabilities breakdown
   - Serverless architecture diagram & highlights panel
-  - Quick-start example incidents
   - Call-to-Action and AWS-themed footer
 
 - **Interactive Incident Analyzer (`/analyze`)**:
-  - Direct incident input with live character counter (up to 10,000 characters)
-  - Quick-fill preset buttons (Lambda Timeout, API Gateway 502, S3 Access Denied, EC2 Unreachable)
-  - AI-driven structured response rendering:
-    - Multi-level Severity assessment (CRITICAL, HIGH, MEDIUM, LOW)
-    - Incident summary
-    - Likely root causes
-    - Recommended diagnostic checks
-    - Step-by-step troubleshooting guide
-    - Practical remediation recommendations
-    - Monospace AWS CLI commands with individual `Copy` and `Copy All` buttons
-  - Comprehensive client-side validation and resilient error handling
+  - **Dual Mode Switcher**:
+    - **Incident Description**: Up to 10,000 characters with presets for Lambda Timeout, API Gateway 502, S3 Access Denied, and EC2 Unreachable.
+    - **CloudWatch Log Analyzer**: Up to 20,000 characters with real multi-line log presets (Lambda Timeout, API Gateway 5xx, App Error, RDS Connection Error).
+  - **AI-Driven Structured Response**:
+    - Multi-level severity assessment (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`)
+    - Error pattern identification and summary
+    - **Verbatim Evidence Quotes**: Explicit log extracts with analytical significance
+    - Likely root causes, recommended checks, troubleshooting steps, and remediation
+    - Long-term prevention strategies
+    - Monospace AWS CLI commands with individual `Copy` and `Copy All`
+  - **Collaboration & Export**:
+    - One-click `Save Incident` to client history
+    - `Copy for Slack / Jira` formatted markdown sharing
+  - **Related Saved Incidents**: Automatically detects prior related incidents from local history
+
+- **Incident History (`/history`)**:
+  - Client-side storage via `localStorage` (`aws_incident_history_v2`)
+  - Real-time search by keywords, summary, error pattern, or severity
+  - Detailed inspection modal with formatted response viewer
+  - Individual item deletion and bulk clear with confirmation dialog
+  - Export capabilities for incident post-mortems
 
 ## Architecture
 
 ```text
 User Browser
      ↓
-React + Vite Frontend (AWS Amplify)
+React + Vite Frontend (AWS Amplify) ── LocalStorage (Incident History)
      ↓
 Amazon API Gateway HTTP API (POST /analyze)
      ↓
-AWS Lambda (Python 3.12, ARM64)
+AWS Lambda (Python 3.11, x86_64)
      ↓
-Amazon Bedrock (Nova 2 Lite)
+Amazon Bedrock (Nova Lite - apac.amazon.nova-lite-v1:0)
 ```
 
 - **Frontend**: React 19, Vite, Vanilla CSS with AWS Design Tokens
 - **API**: Amazon API Gateway HTTP API
-- **Compute**: AWS Lambda (Python 3.12, ARM64)
-- **AI Model**: Amazon Bedrock Nova 2 Lite (`apac.amazon.nova-lite-v1:0`)
+- **Compute**: AWS Lambda (Python 3.11)
+- **AI Model**: Amazon Bedrock Nova Lite (`apac.amazon.nova-lite-v1:0`)
 - **Region**: `ap-south-1`
 
 ## Local Development

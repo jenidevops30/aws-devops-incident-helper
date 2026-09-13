@@ -3,7 +3,7 @@ import os
 import boto3
 
 REGION = os.environ.get("AWS_REGION", "ap-south-1")
-MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "global.amazon.nova-2-lite-v1:0")
+MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "apac.amazon.nova-lite-v1:0")
 
 bedrock = boto3.client(
     "bedrock-runtime",
@@ -60,6 +60,66 @@ Important rules:
 Incident:
 
 {incident}
+"""
+
+
+def build_log_prompt(logs):
+    return f"""
+You are an AWS DevOps troubleshooting specialist and CloudWatch log analysis expert.
+
+Analyze the user-provided application or CloudWatch logs below.
+
+CRITICAL SAFETY & ATTRIBUTION RULES:
+- You MUST NOT claim that you accessed CloudWatch, the user's AWS account, Lambda functions, EC2 instances, or any external AWS systems.
+- Clearly state that your analysis is based strictly and solely on the logs provided by the user.
+- Do not assume specific AWS accounts or invent resource IDs that do not appear in the logs.
+- Identify specific log lines as evidence, quoting them verbatim and explaining what each suggests.
+- Keep AWS CLI commands focused on safe diagnostic inspections and troubleshooting.
+
+Return ONLY valid JSON with exactly these fields:
+
+{{
+  "severity": "LOW|MEDIUM|HIGH|CRITICAL",
+  "summary": "Executive summary of the failure or error observed in the logs",
+  "error_pattern": "Name and brief pattern of the failure (e.g. Lambda Task Timeout, HTTP 502 Bad Gateway, RDS Connection Refused)",
+  "evidence": [
+    {{
+      "quote": "Exact verbatim string or line from the provided log",
+      "significance": "Detailed explanation of what this log line demonstrates or suggests"
+    }}
+  ],
+  "likely_causes": [
+    "Specific cause 1",
+    "Specific cause 2",
+    "Specific cause 3"
+  ],
+  "recommended_checks": [
+    "Specific check 1",
+    "Specific check 2",
+    "Specific check 3"
+  ],
+  "troubleshooting_steps": [
+    "Step 1",
+    "Step 2",
+    "Step 3"
+  ],
+  "remediation": [
+    "Actionable remediation step 1",
+    "Actionable remediation step 2"
+  ],
+  "aws_commands": [
+    "aws ... diagnostic command 1",
+    "aws ... diagnostic command 2"
+  ],
+  "prevention": [
+    "Preventative measure 1",
+    "Preventative measure 2"
+  ]
+}}
+
+User-Provided Logs:
+
+{logs}
 """
 
 
@@ -130,28 +190,60 @@ def lambda_handler(event, context):
                 {"error": "Invalid request format: expected JSON object."}
             )
 
-        incident = body.get("incident", "")
-        if not isinstance(incident, str):
-            return response(
-                400,
-                {"error": "The 'incident' field must be a string."}
-            )
+        action = body.get("action", "").strip()
 
-        incident = incident.strip()
+        # Handle CloudWatch Log Analysis
+        if action == "analyze_logs":
+            logs = body.get("logs", "")
+            if not isinstance(logs, str):
+                return response(
+                    400,
+                    {"error": "The 'logs' field must be a string."}
+                )
 
-        if not incident:
-            return response(
-                400,
-                {"error": "The 'incident' field is required."}
-            )
+            logs = logs.strip()
+            if not logs:
+                return response(
+                    400,
+                    {"error": "The 'logs' field is required when action is 'analyze_logs'."}
+                )
 
-        if len(incident) > 10000:
-            return response(
-                400,
-                {"error": "Incident input is too long. Maximum is 10,000 characters."}
-            )
+            if len(logs) > 20000:
+                return response(
+                    400,
+                    {"error": "Log input is too long. Maximum is 20,000 characters."}
+                )
 
-        prompt = build_prompt(incident)
+            # Safe privacy logging: Record payload size without writing raw user logs to CloudWatch
+            print(f"Executing analyze_logs: payload_length={len(logs)} chars")
+            prompt = build_log_prompt(logs)
+            max_tokens = 2048
+
+        # Handle Standard Incident Analysis (Default / Legacy)
+        else:
+            incident = body.get("incident", "")
+            if not isinstance(incident, str):
+                return response(
+                    400,
+                    {"error": "The 'incident' field must be a string."}
+                )
+
+            incident = incident.strip()
+            if not incident:
+                return response(
+                    400,
+                    {"error": "The 'incident' field is required."}
+                )
+
+            if len(incident) > 10000:
+                return response(
+                    400,
+                    {"error": "Incident input is too long. Maximum is 10,000 characters."}
+                )
+
+            print(f"Executing analyze_incident: payload_length={len(incident)} chars")
+            prompt = build_prompt(incident)
+            max_tokens = 1200
 
         result = bedrock.converse(
             modelId=MODEL_ID,
@@ -166,8 +258,8 @@ def lambda_handler(event, context):
                 }
             ],
             inferenceConfig={
-                "maxTokens": 1200,
-                "temperature": 0.2
+                "maxTokens": max_tokens,
+                "temperature": 0.1
             }
         )
 

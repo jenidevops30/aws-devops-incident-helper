@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
 import LandingPage from './pages/LandingPage';
 import AnalyzerPage from './pages/AnalyzerPage';
+import HistoryPage from './pages/HistoryPage';
 
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState(() => {
     if (typeof window !== 'undefined') {
-      return window.location.pathname === '/analyze' ? '/analyze' : '/';
+      const path = window.location.pathname;
+      if (path === '/analyze') return '/analyze';
+      if (path === '/history') return '/history';
+      return '/';
     }
     return '/';
   });
@@ -15,7 +19,10 @@ export default function App() {
   // Synchronize route with browser history (back/forward navigation)
   useEffect(() => {
     const handlePopState = () => {
-      setCurrentRoute(window.location.pathname === '/analyze' ? '/analyze' : '/');
+      const path = window.location.pathname;
+      if (path === '/analyze') setCurrentRoute('/analyze');
+      else if (path === '/history') setCurrentRoute('/history');
+      else setCurrentRoute('/');
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -57,10 +64,15 @@ export default function App() {
           onIncidentTextChange={setIncidentText}
           onNavigate={navigate}
         />
+      ) : currentRoute === '/history' ? (
+        <HistoryPage
+          onNavigate={navigate}
+        />
       ) : (
         <LandingPage
           onNavigate={navigate}
           onSelectExample={handleSelectExample}
+          currentRoute={currentRoute}
         />
       )}
     </div>

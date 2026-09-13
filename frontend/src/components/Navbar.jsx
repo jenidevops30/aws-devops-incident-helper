@@ -1,20 +1,29 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getHistory } from '../utils/historyStorage';
 
-export default function Navbar({ onNavigate }) {
+export default function Navbar({ onNavigate, currentRoute = '/' }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [historyCount, setHistoryCount] = useState(0);
 
-  const handleLinkClick = (e, targetId) => {
+  const updateCount = () => {
+    setHistoryCount(getHistory().length);
+  };
+
+  useEffect(() => {
+    updateCount();
+    window.addEventListener('incident_history_updated', updateCount);
+    window.addEventListener('storage', updateCount);
+    return () => {
+      window.removeEventListener('incident_history_updated', updateCount);
+      window.removeEventListener('storage', updateCount);
+    };
+  }, []);
+
+  const handleNav = (e, route, sectionId = null) => {
     e.preventDefault();
     setMobileMenuOpen(false);
     if (onNavigate) {
-      onNavigate('/', targetId);
-    }
-  };
-
-  const handleLaunchClick = () => {
-    setMobileMenuOpen(false);
-    if (onNavigate) {
-      onNavigate('/analyze');
+      onNavigate(route, sectionId);
     }
   };
 
@@ -23,7 +32,7 @@ export default function Navbar({ onNavigate }) {
       <div className="container navbar-container">
         <button 
           className="navbar-brand" 
-          onClick={(e) => handleLinkClick(e, 'top')}
+          onClick={(e) => handleNav(e, '/', 'top')}
           aria-label="AWS DevOps Incident Helper Home"
         >
           <img 
@@ -35,22 +44,38 @@ export default function Navbar({ onNavigate }) {
         </button>
 
         <nav className={`navbar-links ${mobileMenuOpen ? 'open' : ''}`} aria-label="Main Navigation">
-          <button className="nav-link" onClick={(e) => handleLinkClick(e, 'top')}>Home</button>
-          <button className="nav-link" onClick={(e) => handleLinkClick(e, 'how-it-works')}>How It Works</button>
-          <button className="nav-link" onClick={(e) => handleLinkClick(e, 'features')}>Features</button>
-          <button className="nav-link" onClick={(e) => handleLinkClick(e, 'architecture')}>Architecture</button>
-          <button className="nav-link" onClick={(e) => handleLinkClick(e, 'examples')}>Examples</button>
+          <button 
+            className={`nav-link ${currentRoute === '/' ? 'active' : ''}`} 
+            onClick={(e) => handleNav(e, '/', 'top')}
+          >
+            Home
+          </button>
+          <button 
+            className={`nav-link ${currentRoute === '/analyze' ? 'active' : ''}`} 
+            onClick={(e) => handleNav(e, '/analyze')}
+          >
+            Analyzer
+          </button>
+          <button 
+            className={`nav-link ${currentRoute === '/history' ? 'active' : ''}`} 
+            onClick={(e) => handleNav(e, '/history')}
+          >
+            <span>History</span>
+            {historyCount > 0 ? (
+              <span className="navbar-history-badge">{historyCount}</span>
+            ) : null}
+          </button>
         </nav>
 
         <div className="navbar-actions">
           <button 
             className="btn btn-primary navbar-cta-btn" 
-            onClick={handleLaunchClick}
+            onClick={(e) => handleNav(e, '/analyze')}
             aria-label="Launch Incident Helper App"
           >
-            Launch Incident Helper →
+            Launch Analyzer →
           </button>
-          <div className="navbar-avatar" title="AWS DevOps Engineer" aria-hidden="true">
+          <div className="navbar-avatar" title="AWS DevOps Engineer (Stateless)" aria-hidden="true">
             <span className="material-symbols-outlined">person</span>
           </div>
           <button 
@@ -59,7 +84,9 @@ export default function Navbar({ onNavigate }) {
             aria-label={mobileMenuOpen ? 'Close Menu' : 'Open Menu'}
             aria-expanded={mobileMenuOpen}
           >
-            {mobileMenuOpen ? '✕' : '☰'}
+            <span className="material-symbols-outlined">
+              {mobileMenuOpen ? 'close' : 'menu'}
+            </span>
           </button>
         </div>
       </div>

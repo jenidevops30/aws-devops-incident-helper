@@ -21,54 +21,57 @@ The goal is to help developers quickly understand:
 
 ## ✨ Features
 
-- **Incident Input**: Large textarea for pasting errors, logs, or incident descriptions
-- **Example Incidents**: Pre-defined buttons for common AWS issues (Lambda timeout, API Gateway 502, S3 AccessDenied, etc.)
-- **AI Analysis**: Powered by Amazon Bedrock (Nova Lite) for intelligent troubleshooting
-- **Structured Response**: Severity, summary, likely causes, recommended checks, troubleshooting steps, remediation, and AWS CLI commands
-- **Responsive UI**: Clean, modern interface that works on desktop and mobile
-- **Error Handling**: Graceful handling of network errors, validation errors, and API failures
+- **Incident Description Analyzer**: Large textarea for pasting error messages, logs, or incident descriptions (up to 10,000 chars)
+- **CloudWatch Log Analyzer**: Dedicated log parsing engine for pasting raw multi-line CloudWatch logs (up to 20,000 chars) with verbatim log evidence extraction
+- **Preset Scenarios**: Ready-to-use presets for Lambda timeouts, API Gateway 5xx, RDS connection errors, and S3 AccessDenied
+- **Incident History**: Client-side persistent storage with real-time keyword search, severity filtering, detailed inspection modal, and Slack/Jira markdown export
+- **Related Saved Incidents**: Automatically detects and surfaces relevant prior incidents when analyzing new issues
+- **AI Analysis**: Powered by Amazon Bedrock (Nova Lite via APAC inference profile)
+- **Structured Response**: 
+  - Standard Incidents: Severity, summary, likely causes, recommended checks, troubleshooting steps, remediation, and AWS CLI commands
+  - CloudWatch Logs: Adds error pattern breakdown, verbatim log quotes with significance, and long-term prevention strategies
+- **Responsive UI**: Clean, AWS-inspired console aesthetic with intuitive tabs, code copy buttons, and responsive design
+- **Security & Privacy**: Zero server-side log persistence, zero direct AWS account access claims, and $0-at-rest client-side architecture
 
 ## 🏗️ Architecture
 
 ```
-User Browser
+User Browser (React + Vite on AWS Amplify)
+    │
+    │  Client-Side: LocalStorage Incident History & Related Matches
+    ▼
+Amazon API Gateway (HTTP API - POST /analyze)
     │
     ▼
-AWS Amplify (React + Vite)
-    │
-    ▼
-Amazon API Gateway (HTTP API)
-    │
-    ▼
-AWS Lambda (Python 3.11)
-    │
+AWS Lambda (Python 3.11, ap-south-1)
+    │  Privacy: Logs metadata only, never raw customer logs
     ▼
 Amazon Bedrock (Nova Lite via APAC Inference Profile)
     │
     ▼
-AI Troubleshooting Response
+Structured Troubleshooting & Evidence JSON
     │
     ▼
-Browser
+Browser (Interactive Log & Incident Explorer)
 ```
 
 ### AWS Services Used
 
-- **AWS Amplify** - Frontend hosting
-- **Amazon API Gateway** - HTTP API endpoint (POST /analyze)
-- **AWS Lambda** - Serverless compute (Python 3.11)
-- **Amazon Bedrock** - AI inference (Nova Lite)
-- **Amazon CloudWatch** - Logging and monitoring
+- **AWS Amplify** - Frontend hosting & continuous deployment
+- **Amazon API Gateway** - HTTP API endpoint (`POST /analyze`)
+- **AWS Lambda** - Serverless compute (Python 3.11, 256MB, 30s timeout)
+- **Amazon Bedrock** - AI inference (Nova Lite `apac.amazon.nova-lite-v1:0`)
+- **Amazon CloudWatch** - Monitoring & Lambda execution logs (privacy-hardened)
 - **AWS IAM** - Least-privilege permissions
 
 ### Region
 
-- **Primary**: ap-south-1 (Asia Pacific - Mumbai)
-- **Bedrock Model**: apac.amazon.nova-lite-v1:0 (cross-region inference)
+- **Primary**: `ap-south-1` (Asia Pacific - Mumbai)
+- **Bedrock Model**: `apac.amazon.nova-lite-v1:0` (cross-region inference profile)
 
 ## 📡 API Specification
 
-### Analyze Incident
+### 1. Analyze Incident Description
 
 **Endpoint:** `POST /analyze`
 
@@ -89,6 +92,39 @@ Browser
   "troubleshooting_steps": ["..."],
   "remediation": ["..."],
   "aws_commands": ["aws lambda get-function --function-name <name>"]
+}
+```
+
+### 2. Analyze CloudWatch Logs
+
+**Endpoint:** `POST /analyze`
+
+**Request:**
+```json
+{
+  "action": "analyze_logs",
+  "logs": "2026-09-13T10:00:00.000Z Task timed out after 30.00 seconds\nREPORT RequestId: abc-123 Duration: 30000 ms..."
+}
+```
+
+**Response:**
+```json
+{
+  "severity": "HIGH",
+  "summary": "Lambda invocation timeout detected from CloudWatch logs",
+  "error_pattern": "Task timed out after 30.00 seconds",
+  "evidence": [
+    {
+      "quote": "Task timed out after 30.00 seconds",
+      "significance": "Direct timeout indicator exceeding function timeout configuration"
+    }
+  ],
+  "likely_causes": ["..."],
+  "recommended_checks": ["..."],
+  "troubleshooting_steps": ["..."],
+  "remediation": ["..."],
+  "aws_commands": ["aws lambda update-function-configuration ..."],
+  "prevention": ["..."]
 }
 ```
 

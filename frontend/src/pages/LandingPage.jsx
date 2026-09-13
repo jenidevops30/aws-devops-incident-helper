@@ -7,10 +7,10 @@ import ExampleIncidents from '../components/ExampleIncidents';
 import CTA from '../components/CTA';
 import Footer from '../components/Footer';
 
-export default function LandingPage({ onNavigate, onSelectExample }) {
+export default function LandingPage({ onNavigate, onSelectExample, currentRoute = '/' }) {
   return (
     <div className="landing-page">
-      <Navbar onNavigate={onNavigate} />
+      <Navbar onNavigate={onNavigate} currentRoute={currentRoute} />
       <main>
         <Hero onLaunch={() => onNavigate('/analyze')} />
         <HowItWorks />
