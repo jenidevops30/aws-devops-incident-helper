@@ -46,3 +46,4 @@ frontend/screenshots/
 
 stitch_designs/
 CLAUDE.md
+architecture/generate_diagram.py
