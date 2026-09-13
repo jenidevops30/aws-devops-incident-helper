@@ -82,32 +82,13 @@ Browser
 **Response:**
 ```json
 {
-  "severity": "HIGH",
-  "summary": "The Lambda function is exceeding its execution time.",
-  "likely_causes": [
-    "Slow downstream API",
-    "Database connection timeout",
-    "VPC networking issue"
-  ],
-  "recommended_checks": [
-    "Check CloudWatch logs",
-    "Check Lambda timeout configuration",
-    "Check downstream API latency"
-  ],
-  "troubleshooting_steps": [
-    "Review CloudWatch Logs for the Lambda function",
-    "Check the Lambda timeout setting in configuration",
-    "Analyze downstream service response times"
-  ],
-  "remediation": [
-    "Increase timeout if appropriate",
-    "Investigate slow dependencies",
-    "Review VPC networking"
-  ],
-  "aws_commands": [
-    "aws lambda get-function-configuration --function-name <function-name>",
-    "aws logs filter-log-events --log-group-name /aws/lambda/<function-name>"
-  ]
+  "severity": "MEDIUM",
+  "summary": "...",
+  "likely_causes": ["..."],
+  "recommended_checks": ["..."],
+  "troubleshooting_steps": ["..."],
+  "remediation": ["..."],
+  "aws_commands": ["aws lambda get-function --function-name <name>"]
 }
 ```
 
