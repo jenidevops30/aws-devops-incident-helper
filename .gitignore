@@ -43,6 +43,6 @@ scratch/
 frontend/screenshots/
 
 # Internal/debug files — not needed in repo
-screenshots/
+
 stitch_designs/
 CLAUDE.md
