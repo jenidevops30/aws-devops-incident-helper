@@ -109,3 +109,9 @@ To preview the production build locally:
 ```bash
 npm run preview
 ```
+
+## Live Deployment
+
+The application is deployed on AWS Amplify Hosting:
+- **Production URL:** [https://main.d2v4zdm3pgizqg.amplifyapp.com](https://main.d2v4zdm3pgizqg.amplifyapp.com)
+
