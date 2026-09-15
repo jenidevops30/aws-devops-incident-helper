@@ -1,1 +1,0 @@
-AWS Read-Only Diagnostics review metadata.
