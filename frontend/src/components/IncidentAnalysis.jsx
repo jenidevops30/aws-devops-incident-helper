@@ -18,87 +18,33 @@ export default function IncidentAnalysis({ analysis, isLoading, error, onRetry, 
     if (lower.includes('iam') || lower.includes('role') || lower.includes('policy') || lower.includes('sts')) return 'IAM';
     if (lower.includes('cloudformation') || lower.includes('stack')) return 'CloudFormation';
     if (lower.includes('cloudwatch') || lower.includes('log')) return 'CloudWatch';
-    if (lower.includes('vpc') || lower.includes('subnet') || lower.includes('nat gateway')) return 'VPC / Networking';
+    if (lower.includes('vpc') || lower.includes('subnet') || lower.includes('nat gateway')) return 'VPC';
     return 'Lambda';
   };
 
   const handleOpenCliGenerator = () => {
-    if (onNavigate) {
-      const detectedService = inferService(`${rawIncident || ''} ${analysis?.summary || ''}`);
-      onNavigate('/cli-generator', null, {
-        service: detectedService,
-        incident: rawIncident || analysis?.summary || '',
-        region: 'ap-south-1',
-      });
-    }
+    if (onNavigate) onNavigate('/cli-generator', null, { service: inferService(`${rawIncident || ''} ${analysis?.summary || ''}`), incident: rawIncident || analysis?.summary || '', region: 'ap-south-1' });
   };
 
-  if (isLoading) {
-    return (
-      <div className="loading-state-card" role="status" aria-live="polite">
-        <div className="loading-spinner-wrap">
-          <div className="loading-ping"></div>
-          <div className="loading-spin"></div>
-        </div>
-        <h3 className="loading-title">Analyzing Incident Architecture...</h3>
-        <p className="loading-desc">
-          Querying Amazon Bedrock (Nova Lite) and correlating AWS best practice runbooks.
-        </p>
-      </div>
-    );
-  }
+  const handleOpenRunbook = () => {
+    if (!onNavigate) return;
+    onNavigate('/runbook-generator', null, {
+      title: rawIncident ? rawIncident.slice(0, 80) : 'AWS Incident Runbook',
+      service: inferService(`${rawIncident || ''} ${analysis?.summary || ''}`),
+      severity: analysis?.severity ? analysis.severity.charAt(0) + analysis.severity.slice(1).toLowerCase() : 'Unknown',
+      description: rawIncident || analysis?.summary || '',
+      existing_analysis: JSON.stringify(analysis, null, 2),
+      diagnostic_commands: (analysis?.aws_commands || []).join('\n'),
+    });
+  };
 
-  if (error) {
-    return (
-      <div className="error-state-card" role="alert">
-        <div className="error-icon-badge" aria-hidden="true">
-          <span className="material-symbols-outlined">error</span>
-        </div>
-        <h3 className="error-title">Incident Analysis Failed</h3>
-        <p className="error-desc">
-          Unable to generate troubleshooting recommendations. Please verify your connection and try again.
-        </p>
-        {onRetry ? (
-          <button className="btn btn-secondary retry-btn" onClick={onRetry}>
-            <span className="material-symbols-outlined">refresh</span>
-            <span>Retry Analysis</span>
-          </button>
-        ) : null}
-      </div>
-    );
-  }
-
-  if (!analysis) {
-    return (
-      <div className="empty-analysis-card">
-        <div className="empty-analysis-inner">
-          <div className="empty-state-icon" aria-hidden="true">
-            <span className="material-symbols-outlined">description</span>
-          </div>
-          <h3 className="empty-state-title">Awaiting Incident Input</h3>
-          <p className="empty-state-text">
-            Enter an AWS incident description or error message above, or choose an example scenario to generate a structured diagnostic report.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <div className="loading-state-card" role="status" aria-live="polite"><div className="loading-spinner-wrap"><div className="loading-ping"></div><div className="loading-spin"></div></div><h3 className="loading-title">Analyzing Incident Architecture...</h3><p className="loading-desc">Querying Amazon Bedrock (Nova Lite) and correlating AWS best practice runbooks.</p></div>;
+  if (error) return <div className="error-state-card" role="alert"><div className="error-icon-badge"><span className="material-symbols-outlined">error</span></div><h3 className="error-title">Incident Analysis Failed</h3><p className="error-desc">Unable to generate troubleshooting recommendations. Please verify your connection and try again.</p>{onRetry ? <button className="btn btn-secondary retry-btn" onClick={onRetry}><span className="material-symbols-outlined">refresh</span>Retry Analysis</button> : null}</div>;
+  if (!analysis) return <div className="empty-analysis-card"><div className="empty-analysis-inner"><div className="empty-state-icon"><span className="material-symbols-outlined">description</span></div><h3 className="empty-state-title">Awaiting Incident Input</h3><p className="empty-state-text">Enter an AWS incident description or error message above, or choose an example scenario to generate a structured diagnostic report.</p></div></div>;
 
   const handleSave = () => {
-    const title = rawIncident ? rawIncident.slice(0, 60) : 'AWS Incident';
-    const result = saveIncident({
-      title,
-      type: 'incident',
-      severity: analysis.severity || 'MEDIUM',
-      summary: analysis.summary || '',
-      analysis,
-      rawInput: rawIncident || '',
-    });
-
-    if (result) {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    }
+    const result = saveIncident({ title: rawIncident ? rawIncident.slice(0, 60) : 'AWS Incident', type: 'incident', severity: analysis.severity || 'MEDIUM', summary: analysis.summary || '', analysis, rawInput: rawIncident || '' });
+    if (result) { setSaved(true); setTimeout(() => setSaved(false), 3000); }
   };
 
   const handleCopySlack = () => {
@@ -107,140 +53,27 @@ export default function IncidentAnalysis({ analysis, isLoading, error, onRetry, 
     const stepsText = (analysis.troubleshooting_steps || []).map((s, idx) => `${idx + 1}. ${s}`).join('\n');
     const remediationText = (analysis.remediation || []).map((r) => `- ${r}`).join('\n');
     const commandsText = (analysis.aws_commands || []).map((cmd) => `\`\`\`bash\n${cmd}\n\`\`\``).join('\n');
-
-    const markdown = `### 🚨 AWS Incident Analysis: ${analysis.severity || 'ALERT'}
-
-**Summary:**
-${analysis.summary}
-
-**Likely Causes:**
-${causesText}
-
-**Recommended Checks:**
-${checksText}
-
-**Troubleshooting Steps:**
-${stepsText}
-
-**Remediation:**
-${remediationText}
-
-**AWS CLI Diagnostic Commands:**
-${commandsText || 'None generated.'}
-
----
-*Generated by AWS DevOps Incident Helper (Private & Stateless)*`;
-
-    navigator.clipboard.writeText(markdown).then(() => {
-      setCopiedSlack(true);
-      setTimeout(() => setCopiedSlack(false), 3000);
-    });
+    const markdown = `### 🚨 AWS Incident Analysis: ${analysis.severity || 'ALERT'}\n\n**Summary:**\n${analysis.summary}\n\n**Likely Causes:**\n${causesText}\n\n**Recommended Checks:**\n${checksText}\n\n**Troubleshooting Steps:**\n${stepsText}\n\n**Remediation:**\n${remediationText}\n\n**AWS CLI Diagnostic Commands:**\n${commandsText || 'None generated.'}\n\n---\n*Generated by AWS DevOps Incident Helper (Private & Stateless)*`;
+    navigator.clipboard.writeText(markdown).then(() => { setCopiedSlack(true); setTimeout(() => setCopiedSlack(false), 3000); });
   };
 
-  return (
-    <div className="analysis-container">
-      <div className="analysis-results-header">
-        <div className="analysis-title-group">
-          <h2 className="analysis-results-title">
-            <span className="material-symbols-outlined" style={{ color: 'var(--primary)', verticalAlign: 'middle', marginRight: '8px' }}>
-              troubleshoot
-            </span>
-            Diagnostic Analysis Report
-          </h2>
-          <p className="analysis-results-subtitle">
-            AI-generated troubleshooting guidance based on AWS Well-Architected incident response runbooks.
-          </p>
-        </div>
-
-        <div className="analysis-actions-toolbar">
-          {onNavigate ? (
-            <button
-              className="btn btn-sm btn-secondary"
-              onClick={handleOpenCliGenerator}
-              title="Generate targeted AWS CLI diagnostic commands for this incident"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>terminal</span>
-              <span>Generate CLI Diagnostics</span>
-            </button>
-          ) : null}
-
-          <button
-            className={`btn btn-sm ${saved ? 'btn-success' : 'btn-secondary'}`}
-            onClick={handleSave}
-            title="Save to local browser history"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-              {saved ? 'check_circle' : 'bookmark_add'}
-            </span>
-            <span>{saved ? 'Saved in History' : 'Save Incident'}</span>
-          </button>
-
-          <button
-            className={`btn btn-sm ${copiedSlack ? 'btn-success' : 'btn-secondary'}`}
-            onClick={handleCopySlack}
-            title="Copy full incident briefing formatted for Slack / Jira"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-              {copiedSlack ? 'done' : 'content_paste'}
-            </span>
-            <span>{copiedSlack ? 'Copied for Slack!' : 'Copy for Slack / Jira'}</span>
-          </button>
-        </div>
-      </div>
-
-      <SeverityCard severity={analysis.severity} />
-
-      <AnalysisSection
-        title="Summary"
-        icon={<span className="material-symbols-outlined">subject</span>}
-        items={analysis.summary}
-        type="summary"
-        emptyMessage="No summary provided."
-      />
-
-      <AnalysisSection
-        title="Likely Causes"
-        icon={<span className="material-symbols-outlined">psychology</span>}
-        items={analysis.likely_causes}
-        type="bullet"
-        emptyMessage="No specific root causes identified."
-      />
-
-      <AnalysisSection
-        title="Recommended Checks"
-        icon={<span className="material-symbols-outlined">checklist</span>}
-        items={analysis.recommended_checks}
-        type="bullet"
-        emptyMessage="No recommended checks provided."
-      />
-
-      <AnalysisSection
-        title="Troubleshooting Steps"
-        icon={<span className="material-symbols-outlined">format_list_numbered</span>}
-        items={analysis.troubleshooting_steps}
-        type="numbered"
-        emptyMessage="No specific troubleshooting steps provided."
-      />
-
-      <AnalysisSection
-        title="Remediation"
-        icon={<span className="material-symbols-outlined">build</span>}
-        items={analysis.remediation}
-        type="bullet"
-        emptyMessage="No remediation recommendations provided."
-      />
-
-      <CommandList commands={analysis.aws_commands} />
-
-      <div className="disclaimer-card" role="note">
-        <div className="disclaimer-icon" aria-hidden="true">
-          <span className="material-symbols-outlined">info</span>
-        </div>
-        <div>
-          <strong>AI-generated guidance is informational.</strong> Always verify recommendations against
-          your AWS environment and documentation before executing production changes.
-        </div>
+  return <div className="analysis-container">
+    <div className="analysis-results-header">
+      <div className="analysis-title-group"><h2 className="analysis-results-title"><span className="material-symbols-outlined" style={{ color: 'var(--primary)', verticalAlign: 'middle', marginRight: '8px' }}>troubleshoot</span>Diagnostic Analysis Report</h2><p className="analysis-results-subtitle">AI-generated troubleshooting guidance based on the incident information supplied.</p></div>
+      <div className="analysis-actions-toolbar">
+        {onNavigate ? <button className="btn btn-sm btn-primary" onClick={handleOpenRunbook} title="Convert this investigation into an operational runbook"><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>menu_book</span><span>Generate Runbook</span></button> : null}
+        {onNavigate ? <button className="btn btn-sm btn-secondary" onClick={handleOpenCliGenerator}><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>terminal</span><span>Generate CLI Diagnostics</span></button> : null}
+        <button className={`btn btn-sm ${saved ? 'btn-success' : 'btn-secondary'}`} onClick={handleSave}><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>{saved ? 'check_circle' : 'bookmark_add'}</span><span>{saved ? 'Saved in History' : 'Save Incident'}</span></button>
+        <button className={`btn btn-sm ${copiedSlack ? 'btn-success' : 'btn-secondary'}`} onClick={handleCopySlack}><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>{copiedSlack ? 'done' : 'content_paste'}</span><span>{copiedSlack ? 'Copied for Slack!' : 'Copy for Slack / Jira'}</span></button>
       </div>
     </div>
-  );
+    <SeverityCard severity={analysis.severity} />
+    <AnalysisSection title="Summary" icon={<span className="material-symbols-outlined">subject</span>} items={analysis.summary} type="summary" emptyMessage="No summary provided." />
+    <AnalysisSection title="Likely Causes" icon={<span className="material-symbols-outlined">psychology</span>} items={analysis.likely_causes} type="bullet" emptyMessage="No specific root causes identified." />
+    <AnalysisSection title="Recommended Checks" icon={<span className="material-symbols-outlined">checklist</span>} items={analysis.recommended_checks} type="bullet" emptyMessage="No recommended checks provided." />
+    <AnalysisSection title="Troubleshooting Steps" icon={<span className="material-symbols-outlined">format_list_numbered</span>} items={analysis.troubleshooting_steps} type="numbered" emptyMessage="No specific troubleshooting steps provided." />
+    <AnalysisSection title="Remediation" icon={<span className="material-symbols-outlined">build</span>} items={analysis.remediation} type="bullet" emptyMessage="No remediation recommendations provided." />
+    <CommandList commands={analysis.aws_commands} />
+    <div className="disclaimer-card" role="note"><div className="disclaimer-icon"><span className="material-symbols-outlined">info</span></div><div><strong>AI-generated guidance is informational.</strong> Always verify recommendations against your AWS environment and documentation before executing production changes.</div></div>
+  </div>;
 }
