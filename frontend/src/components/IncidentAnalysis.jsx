@@ -38,6 +38,22 @@ export default function IncidentAnalysis({ analysis, isLoading, error, onRetry, 
     });
   };
 
+  const handleOpenReport = () => {
+    if (!onNavigate) return;
+    onNavigate('/incident-report', null, {
+      form: {
+        title: rawIncident ? rawIncident.slice(0, 160) : 'AWS Incident Report',
+        service: inferService(`${rawIncident || ''} ${analysis?.summary || ''}`),
+        severity: analysis?.severity ? analysis.severity.charAt(0) + analysis.severity.slice(1).toLowerCase() : 'Unknown',
+        description: rawIncident || analysis?.summary || '',
+        analysis: JSON.stringify(analysis, null, 2),
+        diagnostic_commands: (analysis?.aws_commands || []).join('\n'),
+        troubleshooting: (analysis?.troubleshooting_steps || []).join('\n'),
+        remediation: (analysis?.remediation || []).join('\n'),
+      },
+    });
+  };
+
   if (isLoading) return <div className="loading-state-card" role="status" aria-live="polite"><div className="loading-spinner-wrap"><div className="loading-ping"></div><div className="loading-spin"></div></div><h3 className="loading-title">Analyzing Incident Architecture...</h3><p className="loading-desc">Querying Amazon Bedrock (Nova Lite) and correlating AWS best practice runbooks.</p></div>;
   if (error) return <div className="error-state-card" role="alert"><div className="error-icon-badge"><span className="material-symbols-outlined">error</span></div><h3 className="error-title">Incident Analysis Failed</h3><p className="error-desc">Unable to generate troubleshooting recommendations. Please verify your connection and try again.</p>{onRetry ? <button className="btn btn-secondary retry-btn" onClick={onRetry}><span className="material-symbols-outlined">refresh</span>Retry Analysis</button> : null}</div>;
   if (!analysis) return <div className="empty-analysis-card"><div className="empty-analysis-inner"><div className="empty-state-icon"><span className="material-symbols-outlined">description</span></div><h3 className="empty-state-title">Awaiting Incident Input</h3><p className="empty-state-text">Enter an AWS incident description or error message above, or choose an example scenario to generate a structured diagnostic report.</p></div></div>;
@@ -61,7 +77,8 @@ export default function IncidentAnalysis({ analysis, isLoading, error, onRetry, 
     <div className="analysis-results-header">
       <div className="analysis-title-group"><h2 className="analysis-results-title"><span className="material-symbols-outlined" style={{ color: 'var(--primary)', verticalAlign: 'middle', marginRight: '8px' }}>troubleshoot</span>Diagnostic Analysis Report</h2><p className="analysis-results-subtitle">AI-generated troubleshooting guidance based on the incident information supplied.</p></div>
       <div className="analysis-actions-toolbar">
-        {onNavigate ? <button className="btn btn-sm btn-primary" onClick={handleOpenRunbook} title="Convert this investigation into an operational runbook"><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>menu_book</span><span>Generate Runbook</span></button> : null}
+        {onNavigate ? <button className="btn btn-sm btn-primary" onClick={handleOpenReport} title="Create a professional incident report"><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>description</span><span>Generate Incident Report</span></button> : null}
+        {onNavigate ? <button className="btn btn-sm btn-secondary" onClick={handleOpenRunbook} title="Convert this investigation into an operational runbook"><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>menu_book</span><span>Generate Runbook</span></button> : null}
         {onNavigate ? <button className="btn btn-sm btn-secondary" onClick={handleOpenCliGenerator}><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>terminal</span><span>Generate CLI Diagnostics</span></button> : null}
         <button className={`btn btn-sm ${saved ? 'btn-success' : 'btn-secondary'}`} onClick={handleSave}><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>{saved ? 'check_circle' : 'bookmark_add'}</span><span>{saved ? 'Saved in History' : 'Save Incident'}</span></button>
         <button className={`btn btn-sm ${copiedSlack ? 'btn-success' : 'btn-secondary'}`} onClick={handleCopySlack}><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>{copiedSlack ? 'done' : 'content_paste'}</span><span>{copiedSlack ? 'Copied for Slack!' : 'Copy for Slack / Jira'}</span></button>

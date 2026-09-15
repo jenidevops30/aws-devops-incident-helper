@@ -18,22 +18,22 @@ The goal is to help developers quickly understand:
 - What they should check
 - Which AWS commands may help
 - How they can resolve the problem
+- How to turn an investigation into a reusable incident report
 
 ## ✨ Features
 
 - **Incident Description Analyzer**: Large textarea for pasting error messages, logs, or incident descriptions (up to 10,000 chars)
 - **CloudWatch Log Analyzer**: Dedicated log parsing engine for pasting raw multi-line CloudWatch logs (up to 20,000 chars) with verbatim log evidence extraction
 - **CLI Diagnostic Generator (`/cli-generator`)**: Safe, read-only AWS CLI command generator with copy and text runbook download capabilities
-- **Preset Scenarios**: Ready-to-use presets for Lambda timeouts, API Gateway 5xx, RDS connection errors, and S3 AccessDenied
+- **Incident Runbook Generator (`/runbook-generator`)**: Converts incident investigations into review-first operational runbooks
+- **Incident Export & Reporting (`/incident-report`)**: Generates professional incident reports from manual input, analyzer results, logs, runbooks, CLI diagnostics, or local history
 - **Incident History**: Client-side persistent storage with real-time keyword search, severity filtering, detailed inspection modal, and Slack/Jira markdown export
+- **Report Export**: Copy full report, copy Markdown, download Markdown, download TXT, and browser print-to-PDF
 - **Related Saved Incidents**: Automatically detects and surfaces relevant prior incidents when analyzing new issues
 - **AI Analysis**: Powered by Amazon Bedrock (Nova Lite via APAC inference profile)
-- **Structured Response**: 
-  - Standard Incidents: Severity, summary, likely causes, recommended checks, troubleshooting steps, remediation, and AWS CLI commands
-  - CloudWatch Logs: Adds error pattern breakdown, verbatim log quotes with significance, and long-term prevention strategies
-  - CLI Diagnostics: Read-only command playbook, verification descriptions, investigative purpose, and safety warnings
+- **Structured Response**: Standard incidents, CloudWatch logs, CLI diagnostics, runbooks, and incident reports use structured JSON
 - **Responsive UI**: Clean, AWS-inspired console aesthetic with intuitive tabs, code copy buttons, and responsive design
-- **Security & Privacy**: Zero server-side log persistence, zero direct AWS account access claims, and $0-at-rest client-side architecture
+- **Security & Privacy**: Zero server-side incident persistence, zero direct AWS account access, and client-side history storage
 
 ## 🏗️ Architecture
 
@@ -45,17 +45,37 @@ User Browser (React + Vite on AWS Amplify)
 Amazon API Gateway (HTTP API - POST /analyze)
     │
     ▼
-AWS Lambda (Python 3.11, ap-south-1)
-    │  Privacy: Logs metadata only, never raw customer logs
-    │  Safety: Dual-layer read-only command sanitizer
+AWS Lambda (Python 3.11, 256MB, 30s)
+    │
+    ├── analyze incident
+    ├── analyze CloudWatch logs
+    ├── generate CLI diagnostics
+    ├── generate runbook
+    └── generate incident report
+    │
     ▼
 Amazon Bedrock (Nova Lite via APAC Inference Profile)
     │
     ▼
-Structured Troubleshooting & CLI Runbook JSON
+Structured JSON
+    │
+    ├── Troubleshooting Analysis
+    ├── CLI Diagnostic Playbook
+    ├── Operational Runbook
+    └── Professional Incident Report
     │
     ▼
-Browser (Interactive Log, Incident & CLI Playbook Explorer)
+Browser (Interactive Explorer + Local History + Export)
+```
+
+### Incident Reporting Flow
+
+```
+Incident Analyzer ─┐
+CloudWatch Logs ───┤
+CLI Generator ─────┼──> Incident Report Generator ──> Markdown / TXT / Print
+Runbook Generator ─┤
+Incident History ──┘
 ```
 
 ### AWS Services Used
@@ -110,27 +130,6 @@ Browser (Interactive Log, Incident & CLI Playbook Explorer)
 }
 ```
 
-**Response:**
-```json
-{
-  "severity": "HIGH",
-  "summary": "Lambda invocation timeout detected from CloudWatch logs",
-  "error_pattern": "Task timed out after 30.00 seconds",
-  "evidence": [
-    {
-      "quote": "Task timed out after 30.00 seconds",
-      "significance": "Direct timeout indicator exceeding function timeout configuration"
-    }
-  ],
-  "likely_causes": ["..."],
-  "recommended_checks": ["..."],
-  "troubleshooting_steps": ["..."],
-  "remediation": ["..."],
-  "aws_commands": ["aws lambda update-function-configuration ..."],
-  "prevention": ["..."]
-}
-```
-
 ### 3. Generate CLI Diagnostics
 
 **Endpoint:** `POST /analyze`
@@ -146,22 +145,63 @@ Browser (Interactive Log, Incident & CLI Playbook Explorer)
 }
 ```
 
-**Response:**
+### 4. Generate Runbook
+
+**Endpoint:** `POST /analyze`
+
+**Request:**
 ```json
 {
+  "action": "generate_runbook",
+  "title": "Lambda Timeout Incident",
   "service": "Lambda",
-  "summary": "Retrieves configuration and invocation metrics for payment-processor to isolate timeout triggers.",
-  "commands": [
-    {
-      "command": "aws lambda get-function-configuration --function-name payment-processor --region ap-south-1",
-      "description": "Retrieves current function timeout, memory size, and environment variables.",
-      "purpose": "Verifies whether configured timeout is too low for downstream latency.",
-      "risk": "READ_ONLY"
-    }
-  ],
-  "safety_note": "These commands are intended for read-only diagnostics. Review commands before running them in your AWS environment."
+  "severity": "High",
+  "description": "Lambda invocations are timing out..."
 }
 ```
+
+### 5. Generate Incident Report
+
+**Endpoint:** `POST /analyze`
+
+**Request:**
+```json
+{
+  "action": "generate_incident_report",
+  "title": "Lambda Timeout Incident",
+  "service": "Lambda",
+  "severity": "High",
+  "description": "Lambda invocations are timing out...",
+  "analysis": "...",
+  "logs": "...",
+  "diagnostic_commands": "...",
+  "troubleshooting": "...",
+  "remediation": "...",
+  "verification": "...",
+  "runbook": "...",
+  "timestamp": "..."
+}
+```
+
+The report response contains incident overview, executive summary, impact, symptoms, evidence, separated confirmed/probable/unknown root causes, troubleshooting, read-only commands, remediation, verification, rollback considerations, prevention, and a post-incident checklist.
+
+## 🛡️ Incident Report Safety Rules
+
+The report generator is review-first by design:
+
+- Never invent AWS account IDs, ARNs, resource names, metrics, logs, or timestamps
+- Never claim direct AWS account access
+- Never present an unverified root cause as confirmed
+- Diagnostic commands are sanitized as READ_ONLY
+- Commands are never executed by the application
+- No credentials, tokens, or access keys are requested or exposed
+- Missing information is represented as `Information not provided.`
+
+## 💾 Data & Privacy
+
+Incident History remains in browser `localStorage`. The application does not add a database for reports. Report generation sends only the information the operator supplies to the existing API/Bedrock flow. Generated reports are not automatically persisted on the server.
+
+Avoid storing production secrets, credentials, tokens, or sensitive customer data in browser history.
 
 ## 🛠️ Technology Stack
 
@@ -188,11 +228,14 @@ Browser (Interactive Log, Incident & CLI Playbook Explorer)
 
 ## 🔐 Security
 
-- **Least Privilege IAM**: Lambda only has permissions to invoke the specific Bedrock model and write CloudWatch logs
+- **Least Privilege IAM**: Lambda only has permissions to invoke the configured Bedrock model and write CloudWatch logs
 - **No Hardcoded Credentials**: All credentials managed via IAM roles
-- **Input Validation**: Server-side validation of all user inputs
-- **CORS Configuration**: Properly configured for the deployed frontend origin
+- **Input Validation**: Server-side validation of user inputs and payload size
+- **CORS Configuration**: Configured for the deployed frontend/API integration
 - **No Secrets in Code**: No AWS credentials, API keys, or tokens in source code
+- **Command Sanitization**: Generated diagnostic commands are filtered for state-changing operations
+- **No Automatic Execution**: AWS CLI commands are displayed only as operator-reviewed guidance
+- **Safe Rendering**: Incident report content is rendered as React text rather than trusted HTML
 
 ## 💰 Cost Strategy
 
@@ -207,7 +250,7 @@ No EC2, RDS, ECS, OpenSearch, NAT Gateway, or Load Balancers used.
 
 ## 🧪 Testing
 
-### Test Cases
+### Existing Test Scenarios
 
 1. **Lambda Timeout**: "Lambda function is timing out after 30 seconds"
 2. **API Gateway 502**: "API Gateway returns 502 Bad Gateway"
@@ -215,6 +258,11 @@ No EC2, RDS, ECS, OpenSearch, NAT Gateway, or Load Balancers used.
 4. **Empty Input**: Validates minimum length requirement
 5. **Invalid JSON**: Handles malformed requests gracefully
 6. **Very Long Input**: Validates maximum length requirement
+7. **Incident Report**: Generates structured report from supplied incident information
+8. **Missing Report Fields**: Uses explicit missing-information handling
+9. **Read-only Command Sanitization**: Removes state-changing diagnostic commands
+10. **Markdown/TXT Export**: Verifies browser-side report export
+11. **History Report Flow**: Loads a saved local incident into the report generator
 
 ## 📁 Project Structure
 
@@ -224,14 +272,18 @@ aws-devops-incident-helper/
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
+│   │   ├── pages/
+│   │   │   ├── IncidentReportPage.jsx
+│   │   │   └── ...
+│   │   ├── utils/
 │   │   ├── App.jsx
-│   │   ├── App.css
 │   │   ├── main.jsx
-│   │   └── index.css
+│   │   ├── styles.css
+│   │   ├── runbook.css
+│   │   └── incident-report.css
 │   ├── public/
 │   ├── package.json
-│   ├── vite.config.js
-│   └── ...
+│   └── vite.config.js
 │
 ├── backend/
 │   ├── lambda_function.py
@@ -240,9 +292,7 @@ aws-devops-incident-helper/
 │
 ├── architecture/
 │   └── architecture.txt
-│
 ├── screenshots/
-│
 ├── README.md
 ├── PRD.md
 └── .gitignore
@@ -257,32 +307,10 @@ aws-devops-incident-helper/
 
 ### Backend Deployment
 
-1. Create IAM role for Lambda:
-```bash
-aws iam create-role --role-name aws-devops-incident-helper-lambda-role \
-  --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
-```
-
-2. Attach least-privilege policy:
-```bash
-aws iam put-role-policy --role-name aws-devops-incident-helper-lambda-role \
-  --policy-name BedrockAndLogsPolicy \
-  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["bedrock:InvokeModel"],"Resource":["arn:aws:bedrock:ap-south-1:*:inference-profile/apac.amazon.nova-lite-v1:0"]},{"Effect":"Allow","Action":["logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents"],"Resource":"arn:aws:logs:ap-south-1:*:log-group:/aws/lambda/aws-devops-incident-helper*"}]}'
-```
-
-3. Create Lambda function:
-```bash
-cd backend
-zip -r lambda_function.zip lambda_function.py
-aws lambda create-function --function-name aws-devops-incident-helper \
-  --runtime python3.11 --role <role-arn> \
-  --handler lambda_function.lambda_handler \
-  --zip-file fileb://lambda_function.zip \
-  --environment Variables={BEDROCK_MODEL_ID=apac.amazon.nova-lite-v1:0,MAX_TOKENS=2048,TEMPERATURE=0.1} \
-  --region ap-south-1
-```
-
-4. Create API Gateway and connect to Lambda
+1. Package `backend/lambda_function.py`.
+2. Deploy the Lambda function using the existing IAM role and Bedrock model configuration.
+3. Ensure the API Gateway integration points to the updated Lambda.
+4. Test `POST /analyze` with the existing incident, `analyze_logs`, `generate_cli`, `generate_runbook`, and `generate_incident_report` actions.
 
 ### Frontend Deployment
 
@@ -293,7 +321,7 @@ npm ci
 npm run build
 ```
 
-2. Deploy to AWS Amplify (via console or CLI)
+2. Deploy to AWS Amplify using the existing deployment workflow.
 
 ## 📸 Screenshots
 
@@ -320,10 +348,12 @@ npm run build
 - Creating a serverless application with AWS Amplify, API Gateway, Lambda, and Bedrock
 - Configuring least-privilege IAM permissions for Bedrock inference profiles
 - Handling cross-region Bedrock model access via inference profiles
-- Parsing and validating AI model responses (handling markdown code fences)
+- Parsing and validating AI model responses
 - CORS configuration for API Gateway with Lambda proxy integration
-- Manual deployment to Amplify using CreateDeployment/StartDeployment APIs
-- CloudWatch logging for debugging Lambda functions
+- Building reusable incident investigation workflows
+- Turning AI-assisted troubleshooting into structured operational documentation
+- Designing review-first command generation and report exports
+- Keeping incident history client-side without introducing a database
 
 ## 🏆 AWS Weekend Deployment Challenge
 
@@ -336,14 +366,13 @@ This project was built for the AWS Weekend Deployment Challenge, demonstrating:
 
 ## 🔮 Future Improvements
 
-- CloudWatch log analysis integration
-- AWS account-aware troubleshooting (with user permissions)
-- Incident history with DynamoDB storage
+- AWS account-aware troubleshooting with explicit user permissions
+- Incident history synchronization with DynamoDB
 - User authentication with Amazon Cognito
 - Slack/Teams integration for notifications
 - ECS/EKS troubleshooting support
 - CloudFormation/Terraform error analysis
-- Automated remediation suggestions
+- Human-approved automated remediation
 - CI/CD pipeline integration
 
 ## 📄 License

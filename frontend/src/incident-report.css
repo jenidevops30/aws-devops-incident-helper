@@ -1,0 +1,26 @@
+.incident-report-page .runbook-form-card { margin-bottom: 24px; }
+.report-source-bar { display:flex; gap:20px; align-items:end; justify-content:space-between; padding-bottom:18px; margin-bottom:18px; border-bottom:1px solid var(--border); }
+.report-source-bar label { flex:1; max-width:560px; }
+.report-source-bar select { margin-top:8px; width:100%; }
+.incident-report-document { margin-top:24px; }
+.report-header-row { align-items:flex-start; }
+.incident-report-section h4 { margin:18px 0 8px; color:var(--text-light); font-size:.95rem; }
+.report-readonly-badge { display:inline-block; margin-bottom:8px; padding:3px 8px; border-radius:999px; border:1px solid var(--green-border); background:var(--green-light); color:var(--green); font-size:.7rem; font-weight:800; letter-spacing:.04em; }
+.incident-report-footer { margin-top:24px; padding:18px; border-top:1px solid var(--border); color:var(--muted); font-size:.85rem; line-height:1.6; }
+.incident-report-footer strong { color:var(--text); }
+.incident-report-footer span { display:inline-block; margin-top:4px; }
+.history-modal-report-action { display:flex; justify-content:flex-end; margin-bottom:16px; }
+@media (max-width: 900px) { .report-source-bar { align-items:stretch; flex-direction:column; } .report-source-bar label { max-width:none; } }
+@media (max-width: 680px) { .incident-report-page .container { padding-left:1rem; padding-right:1rem; } .report-header-row { flex-direction:column; gap:14px; } .report-header-row .analysis-actions-toolbar { width:100%; display:grid; grid-template-columns:1fr 1fr; } .report-header-row .analysis-actions-toolbar .btn { width:100%; white-space:normal; } .incident-report-section { overflow:hidden; } .runbook-command { flex-direction:column; align-items:stretch; } .runbook-command .btn { align-self:flex-start; } }
+@media print {
+  body { background:#fff !important; color:#111 !important; }
+  .no-print, .analyzer-header, nav, header, button, .runbook-form-card, .history-modal-overlay { display:none !important; }
+  .incident-report-page, .analyzer-main, .incident-report-document { background:#fff !important; color:#111 !important; }
+  .incident-report-document { box-shadow:none !important; border:0 !important; margin:0 !important; padding:0 !important; }
+  .incident-report-section { break-inside:avoid; page-break-inside:avoid; border-color:#ccc !important; }
+  .analysis-section-header h3, .incident-report-section h4, .analysis-results-title { color:#111 !important; }
+  .analysis-section-content, .analysis-section-content p, .runbook-list, .incident-report-footer { color:#222 !important; }
+  .runbook-command { background:#f5f5f5 !important; border-color:#ccc !important; }
+  .runbook-command code { color:#111 !important; }
+  .report-readonly-badge { color:#166534 !important; border-color:#86efac !important; background:#f0fdf4 !important; }
+}

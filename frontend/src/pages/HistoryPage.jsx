@@ -21,6 +21,11 @@ export default function HistoryPage({ onNavigate }) {
   const handleClearAll = () => { clearAllHistory(); setSelectedIncident(null); setConfirmClearOpen(false); loadHistory(); };
 
   const typeLabel = (type) => type === 'log_analysis' ? 'Log Analysis' : type === 'runbook' ? 'Runbook' : 'Incident';
+  const handleGenerateReport = (e, item) => {
+    e.stopPropagation();
+    onNavigate('/incident-report', null, { sourceId: item.id });
+    window.history.replaceState({}, '', `/incident-report?incident=${encodeURIComponent(item.id)}`);
+  };
 
   return <div className="history-page">
     <header className="analyzer-header" role="banner"><div className="container">
@@ -31,7 +36,7 @@ export default function HistoryPage({ onNavigate }) {
 
     <main className="history-main"><div className="container">
       <div className="history-controls-bar"><div className="history-search-wrap"><span className="material-symbols-outlined history-search-icon">search</span><input type="text" className="history-search-input" placeholder="Search saved incidents, runbooks, services, errors, or severity..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} aria-label="Search history" />{searchQuery ? <button className="history-search-clear" onClick={() => setSearchQuery('')} aria-label="Clear search query"><span className="material-symbols-outlined">close</span></button> : null}</div>
-        <div className="history-actions-group"><button className="btn btn-secondary history-nav-analyze-btn" onClick={() => onNavigate('/analyze')}><span className="material-symbols-outlined">add</span>New Incident</button><button className="btn btn-secondary" onClick={() => onNavigate('/runbook-generator')}><span className="material-symbols-outlined">menu_book</span>New Runbook</button>{incidents.length > 0 ? <button className="btn btn-outline-danger" onClick={() => setConfirmClearOpen(true)}><span className="material-symbols-outlined">delete_sweep</span>Clear History</button> : null}</div>
+        <div className="history-actions-group"><button className="btn btn-secondary history-nav-analyze-btn" onClick={() => onNavigate('/analyze')}><span className="material-symbols-outlined">add</span>New Incident</button><button className="btn btn-secondary" onClick={() => onNavigate('/runbook-generator')}><span className="material-symbols-outlined">menu_book</span>New Runbook</button><button className="btn btn-secondary" onClick={() => onNavigate('/incident-report')}><span className="material-symbols-outlined">description</span>New Report</button>{incidents.length > 0 ? <button className="btn btn-outline-danger" onClick={() => setConfirmClearOpen(true)}><span className="material-symbols-outlined">delete_sweep</span>Clear History</button> : null}</div>
       </div>
 
       <div className="history-privacy-notice" role="note"><span className="material-symbols-outlined privacy-notice-icon">shield</span><span><strong>Security & Storage Note:</strong> Saved investigations and runbooks are stored exclusively in your browser's local cache. Avoid saving secrets, tokens, or production credentials.</span></div>
@@ -43,13 +48,14 @@ export default function HistoryPage({ onNavigate }) {
           return <div key={item.id} className={`history-card ${isSelected ? 'selected' : ''}`} onClick={() => setSelectedIncident(item)}>
             <div className="history-card-top"><div className="history-badges-group"><span className={`badge severity-badge ${severityClass}`}>{item.severity}</span><span className="badge type-badge">{typeLabel(item.type)}</span></div><span className="history-timestamp">{item.formattedDate}</span></div>
             <h3 className="history-card-title">{item.title}</h3><p className="history-card-summary">{item.summary || 'Click to view the saved investigation.'}</p>
-            <div className="history-card-actions"><button className="btn btn-sm btn-primary" onClick={(e) => { e.stopPropagation(); setSelectedIncident(item); }}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>visibility</span>View {item.type === 'runbook' ? 'Runbook' : 'Analysis'}</button><button className="btn btn-sm btn-icon-danger" onClick={(e) => handleDelete(e, item.id)} title="Delete record" aria-label="Delete record"><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>delete</span></button></div>
+            <div className="history-card-actions"><button className="btn btn-sm btn-primary" onClick={(e) => { e.stopPropagation(); setSelectedIncident(item); }}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>visibility</span>View {item.type === 'runbook' ? 'Runbook' : 'Analysis'}</button><button className="btn btn-sm btn-secondary" onClick={(e) => handleGenerateReport(e, item)}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>description</span>Generate Report</button><button className="btn btn-sm btn-icon-danger" onClick={(e) => handleDelete(e, item.id)} title="Delete record" aria-label="Delete record"><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>delete</span></button></div>
           </div>;
         })}</div>}
 
       {selectedIncident ? <div className="history-modal-overlay" onClick={() => setSelectedIncident(null)}><div className="history-modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="history-modal-header"><div className="history-modal-title-group"><span className="history-modal-type-badge">{typeLabel(selectedIncident.type)}</span><h2 className="history-modal-title">{selectedIncident.title}</h2><span className="history-modal-date">{selectedIncident.formattedDate}</span></div><button className="history-modal-close" onClick={() => setSelectedIncident(null)} aria-label="Close modal"><span className="material-symbols-outlined">close</span></button></div>
         <div className="history-modal-body">
+          <div className="history-modal-report-action"><button className="btn btn-primary" onClick={(e) => handleGenerateReport(e, selectedIncident)}><span className="material-symbols-outlined">description</span>Generate Incident Report</button></div>
           {selectedIncident.type === 'runbook' ? <div className="analysis-container runbook-results"><div className="analysis-results-header"><div><h2 className="analysis-results-title"><span className="material-symbols-outlined">menu_book</span>{selectedIncident.analysis?.runbook_title || selectedIncident.title}</h2><p className="analysis-results-subtitle">Saved locally in this browser.</p></div></div>{Object.entries({
             'Incident Overview': selectedIncident.analysis?.incident_overview,
             'Impact': selectedIncident.analysis?.impact,
