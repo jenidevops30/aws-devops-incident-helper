@@ -7,12 +7,11 @@ MODEL_ID = os.environ.get('BEDROCK_MODEL_ID', 'apac.amazon.nova-lite-v1:0')
 bedrock = boto3.client('bedrock-runtime', region_name=REGION)
 
 DESTRUCTIVE_COMMAND_KEYWORDS = [
-    'terminate-', 'delete-', ' rm ', ' rb ', 'drop-', 'purge-', 'destroy-',
+    'terminate-', 'delete-', ' rm ', ' rm\t', ' rb ', 'drop-', 'purge-', 'destroy-',
     'modify-', 'update-', 'create-', 'put-', 'stop-', 'reboot-', 'deregister-',
     'disassociate-', 'detach-', 'revoke-', 'authorize-security-group-ingress',
     'authorize-security-group-egress'
 ]
-
 RUNBOOK_SERVICES = {'EC2', 'Lambda', 'API Gateway', 'S3', 'IAM', 'RDS', 'CloudWatch', 'VPC', 'CloudFormation', 'ECS', 'EKS', 'ALB', 'Other'}
 RUNBOOK_SEVERITIES = {'Unknown', 'Low', 'Medium', 'High', 'Critical'}
 
@@ -46,35 +45,15 @@ def build_runbook_prompt(title, service, severity, description, existing_analysi
 Create a practical, review-first operational runbook from ONLY the information supplied below.
 Do not claim AWS account access. Do not invent resources, ARNs, account IDs, IPs, secrets, deployment IDs, or confirmed impact.
 Separate known evidence from possible causes. Diagnostic commands must be READ-ONLY. Never include delete, terminate, stop, reboot, modify, update, create, put, or security-group mutation commands.
-
 Return ONLY valid JSON with exactly this schema:
 {{
-  "runbook_title":"...",
-  "incident_overview":"...",
-  "severity":"Unknown|Low|Medium|High|Critical",
-  "impact":"...",
-  "symptoms":["..."],
-  "initial_triage":["..."],
-  "evidence_to_collect":["..."],
+  "runbook_title":"...","incident_overview":"...","severity":"Unknown|Low|Medium|High|Critical","impact":"...",
+  "symptoms":["..."],"initial_triage":["..."],"evidence_to_collect":["..."],
   "diagnostic_commands":[{{"command":"aws ...","description":"...","purpose":"...","risk":"READ_ONLY"}}],
-  "likely_root_causes":["..."],
-  "troubleshooting_procedure":["..."],
-  "remediation":["..."],
-  "verification":["..."],
-  "rollback_considerations":["..."],
-  "prevention":["..."],
-  "post_incident_checklist":["..."]
+  "likely_root_causes":["..."],"troubleshooting_procedure":["..."],"remediation":["..."],
+  "verification":["..."],"rollback_considerations":["..."],"prevention":["..."],"post_incident_checklist":["..."]
 }}
-
-Title: {title}
-AWS Service: {service}
-Severity: {severity}
-Incident Description: {description}
-Existing Incident Analysis: {existing_analysis}
-Diagnostic Commands: {diagnostic_commands}
-Logs / Evidence: {logs}
-Troubleshooting Notes: {troubleshooting_notes}
-
+Title: {title}\nAWS Service: {service}\nSeverity: {severity}\nIncident Description: {description}\nExisting Incident Analysis: {existing_analysis}\nDiagnostic Commands: {diagnostic_commands}\nLogs / Evidence: {logs}\nTroubleshooting Notes: {troubleshooting_notes}
 If information is missing, say what should be checked instead of inventing facts.'''
 
 
@@ -85,36 +64,47 @@ Never claim access to AWS accounts or systems. Never invent account IDs, ARNs, r
 Clearly distinguish observed evidence from AI recommendations. A root cause is CONFIRMED only when the supplied evidence supports it; otherwise put it under probable or unknown.
 Diagnostic commands must be READ-ONLY. Never include destructive or state-changing commands. Never include credentials, secrets, access keys, or tokens.
 For missing information, use exactly "Information not provided." rather than guessing.
-
 Return ONLY valid JSON with exactly this schema:
 {{
   "incident_overview": {{"title":"...","service":"...","severity":"Unknown|Low|Medium|High|Critical","timestamp":"...","status":"..."}},
-  "executive_summary":"...",
-  "impact":["..."],
-  "symptoms":["..."],
-  "evidence":["..."],
+  "executive_summary":"...","impact":["..."],"symptoms":["..."],"evidence":["..."],
   "root_cause": {{"confirmed":["..."],"probable":["..."],"unknown":["..."]}},
   "troubleshooting":["..."],
   "diagnostic_commands":[{{"command":"aws ...","description":"...","purpose":"...","risk":"READ_ONLY"}}],
-  "remediation": {{"immediate":["..."],"long_term":["..."]}},
-  "verification":["..."],
-  "rollback":["..."],
-  "prevention":["..."],
+  "remediation": {{"immediate":["..."],"long_term":["..."]}},"verification":["..."],"rollback":["..."],"prevention":["..."],
   "post_incident_checklist":["Incident resolved","Root cause confirmed","Monitoring verified","Alerts verified","Logs reviewed","Documentation updated","Runbook updated","Preventive action identified"]
 }}
+Incident Title: {title}\nAWS Service: {service}\nSeverity: {severity}\nDate/Time supplied by operator: {timestamp}\nIncident Description: {description}\nIncident Analysis: {analysis}\nLogs / Evidence: {logs}\nDiagnostic Commands: {commands}\nTroubleshooting Steps: {troubleshooting}\nRemediation: {remediation}\nVerification Results: {verification}\nRunbook: {runbook}\n'''
 
-Incident Title: {title}
-AWS Service: {service}
-Severity: {severity}
-Date/Time supplied by operator: {timestamp}
-Incident Description: {description}
-Incident Analysis: {analysis}
-Logs / Evidence: {logs}
-Diagnostic Commands: {commands}
-Troubleshooting Steps: {troubleshooting}
-Remediation: {remediation}
-Verification Results: {verification}
-Runbook: {runbook}
+
+def build_correlation_prompt(incident, logs, diagnostics, cli, previous, runbook):
+    return f'''You are an evidence-aware AWS DevOps incident correlation specialist.
+Correlate ONLY the operator-supplied evidence below. Connect related symptoms, log patterns, diagnostics, CLI output, previous incidents, and runbook context without pretending to have AWS access.
+Never invent AWS account IDs, ARNs, resource names, metrics, timestamps, log lines, commands, deployment facts, credentials, or impact.
+Do not turn a hypothesis into a confirmed root cause. Classify findings as Confirmed, Probable, Possible, or Unknown based only on supplied evidence. Explain relationships and identify the next safe checks needed to increase confidence.
+Do not execute commands. Any CLI commands returned must be READ-ONLY diagnostic commands only; never include destructive or state-changing commands.
+For missing information use "Information not provided.".
+Return ONLY valid JSON with exactly this schema:
+{{
+  "summary":"Short evidence-aware correlation summary",
+  "severity":"LOW|MEDIUM|HIGH|CRITICAL|Unknown",
+  "evidence_relationships":["Explain how supplied evidence relates"],
+  "confirmed_findings":["Only directly supported findings"],
+  "probable_findings":["Strong but not proven relationships"],
+  "possible_findings":["Plausible relationships needing validation"],
+  "unknowns":["Important unanswered questions"],
+  "recommended_checks":["Safe next checks"],
+  "troubleshooting_steps":["Ordered review-first steps"],
+  "safe_cli_commands":[{{"command":"aws ...","description":"...","purpose":"...","risk":"READ_ONLY"}}],
+  "next_actions":["Concrete operator actions that do not modify resources"]
+}}
+
+INCIDENT DESCRIPTION:\n{incident}
+CLOUDWATCH / APPLICATION LOGS:\n{logs}
+AWS DIAGNOSTIC EVIDENCE:\n{diagnostics}
+CLI OUTPUT:\n{cli}
+PREVIOUS INCIDENT CONTEXT:\n{previous}
+RUNBOOK / TROUBLESHOOTING CONTEXT:\n{runbook}
 '''
 
 
@@ -138,19 +128,15 @@ def sanitize_cli_commands(commands):
 
 
 def sanitize_runbook_commands(commands):
+    return sanitize_cli_commands(commands)
+
+
+def sanitize_correlation_commands(commands):
     safe = []
-    for item in commands if isinstance(commands, list) else []:
-        command = item.get('command', '') if isinstance(item, dict) else item if isinstance(item, str) else ''
-        if not isinstance(command, str) or not command.strip():
+    for item in sanitize_cli_commands(commands):
+        if not item['command'].lstrip().startswith('aws '):
             continue
-        if any(keyword in command.lower() for keyword in DESTRUCTIVE_COMMAND_KEYWORDS):
-            continue
-        safe.append({
-            'command': command,
-            'description': item.get('description', 'Diagnostic check') if isinstance(item, dict) else 'Diagnostic check',
-            'purpose': item.get('purpose', 'Collects diagnostic evidence') if isinstance(item, dict) else 'Collects diagnostic evidence',
-            'risk': 'READ_ONLY'
-        })
+        safe.append({'command': item['command'], 'description': item.get('description', 'Diagnostic check'), 'purpose': item.get('purpose', 'Collects diagnostic evidence'), 'risk': 'READ_ONLY'})
     return safe
 
 
@@ -179,16 +165,24 @@ def extract_json(text):
 
 
 def response(status_code, body):
-    return {
-        'statusCode': status_code,
-        'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token',
-            'Access-Control-Allow-Methods': 'POST,OPTIONS'
-        },
-        'body': json.dumps(body)
-    }
+    return {'statusCode': status_code, 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token', 'Access-Control-Allow-Methods': 'POST,OPTIONS'}, 'body': json.dumps(body)}
+
+
+def call_bedrock(prompt, max_tokens):
+    result = bedrock.converse(modelId=MODEL_ID, messages=[{'role': 'user', 'content': [{'text': prompt}]}], inferenceConfig={'maxTokens': max_tokens, 'temperature': 0.2})
+    return extract_json(result['output']['message']['content'][0]['text'])
+
+
+def require_string(body, key, required=False, max_length=None, default=''):
+    value = body.get(key, default)
+    if not isinstance(value, str):
+        raise ValueError(f"The '{key}' field must be a string.")
+    value = value.strip()
+    if required and not value:
+        raise ValueError(f"The '{key}' field is required.")
+    if max_length and len(value) > max_length:
+        raise ValueError(f"The '{key}' field is too long. Maximum is {max_length} characters.")
+    return value
 
 
 def lambda_handler(event, context):
@@ -208,122 +202,62 @@ def lambda_handler(event, context):
         action = action.strip() if isinstance(action, str) else ''
 
         if action == 'analyze_logs':
-            logs = body.get('logs', '')
-            if not isinstance(logs, str) or not logs.strip():
-                return response(400, {'error': "The 'logs' field is required when action is 'analyze_logs'."})
-            logs = logs.strip()
-            if len(logs) > 20000:
-                return response(400, {'error': 'Log input is too long. Maximum is 20,000 characters.'})
-            print(f'Executing analyze_logs: payload_length={len(logs)} chars')
+            logs = require_string(body, 'logs', True, 20000)
             prompt, max_tokens = build_log_prompt(logs), 2048
-
         elif action == 'generate_cli':
-            service = body.get('service', '')
-            incident = body.get('incident', '')
-            if not isinstance(service, str) or not service.strip():
-                return response(400, {'error': "The 'service' field is required when action is 'generate_cli'."})
-            if not isinstance(incident, str) or not incident.strip():
-                return response(400, {'error': "The 'incident' field is required when action is 'generate_cli'."})
-            service, incident = service.strip()[:100], incident.strip()
-            if len(incident) > 5000:
-                return response(400, {'error': 'Incident description is too long. Maximum is 5,000 characters.'})
-            resource_name = body.get('resource_name', '') if isinstance(body.get('resource_name', ''), str) else ''
-            region = body.get('region', 'ap-south-1') if isinstance(body.get('region', 'ap-south-1'), str) else 'ap-south-1'
-            print(f'Executing generate_cli: service={service}, payload_length={len(incident)} chars')
-            prompt, max_tokens = build_cli_prompt(service, incident, resource_name[:200], region[:50] or 'ap-south-1'), 2048
-
+            service = require_string(body, 'service', True, 100)
+            incident = require_string(body, 'incident', True, 5000)
+            resource_name = require_string(body, 'resource_name', False, 200)
+            region = require_string(body, 'region', False, 50, 'ap-south-1') or 'ap-south-1'
+            prompt, max_tokens = build_cli_prompt(service, incident, resource_name, region), 2048
         elif action == 'generate_runbook':
-            title = body.get('title', '')
-            service = body.get('service', '')
-            severity = body.get('severity', 'Unknown')
-            description = body.get('description', '')
-            fields = {'title': title, 'service': service, 'severity': severity, 'description': description}
-            for key, value in fields.items():
-                if not isinstance(value, str):
-                    return response(400, {'error': f"The '{key}' field must be a string."})
-            title, service, severity, description = title.strip(), service.strip(), severity.strip() or 'Unknown', description.strip()
-            if not title or not description:
-                return response(400, {'error': 'Runbook title and incident description are required.'})
+            title = require_string(body, 'title', True, 160)
+            service = require_string(body, 'service', True, 100)
+            severity = require_string(body, 'severity', False, 20, 'Unknown') or 'Unknown'
+            description = require_string(body, 'description', True, 10000)
             if service not in RUNBOOK_SERVICES:
                 return response(400, {'error': 'Invalid AWS service selected.'})
             if severity not in RUNBOOK_SEVERITIES:
                 return response(400, {'error': 'Invalid severity selected.'})
-            if len(title) > 160 or len(description) > 10000:
-                return response(400, {'error': 'Runbook title or incident description is too long.'})
-            optional = {}
-            for key, limit in [('existing_analysis', 8000), ('diagnostic_commands', 6000), ('logs', 10000), ('troubleshooting_notes', 6000)]:
-                value = body.get(key, '')
-                if not isinstance(value, str):
-                    value = ''
-                value = value.strip()
-                if len(value) > limit:
-                    return response(400, {'error': f"The '{key}' field is too long. Maximum is {limit} characters."})
-                optional[key] = value
-            print(f'Executing generate_runbook: service={service}, severity={severity}, payload_length={len(description)} chars')
+            optional = {key: require_string(body, key, False, limit) for key, limit in [('existing_analysis', 8000), ('diagnostic_commands', 6000), ('logs', 10000), ('troubleshooting_notes', 6000)]}
             prompt = build_runbook_prompt(title, service, severity, description, optional['existing_analysis'], optional['diagnostic_commands'], optional['logs'], optional['troubleshooting_notes'])
             max_tokens = 4096
-
         elif action == 'generate_incident_report':
-            string_fields = ['title', 'service', 'severity', 'description', 'analysis', 'logs', 'diagnostic_commands', 'troubleshooting', 'remediation', 'verification', 'runbook', 'timestamp']
-            values = {}
-            for key in string_fields:
-                value = body.get(key, '')
-                if not isinstance(value, str):
-                    return response(400, {'error': f"The '{key}' field must be a string."})
-                values[key] = value.strip()
-            if not values['title'] or not values['description']:
-                return response(400, {'error': 'Incident title and incident description are required.'})
+            values = {key: require_string(body, key, key in {'title', 'description'}, limit) for key, limit in [('title',160),('service',100),('severity',20),('description',10000),('analysis',8000),('logs',10000),('diagnostic_commands',6000),('troubleshooting',6000),('remediation',6000),('verification',6000),('runbook',8000),('timestamp',100)]}
             if values['severity'] not in RUNBOOK_SEVERITIES:
                 return response(400, {'error': 'Invalid severity selected.'})
-            limits = {'title': 160, 'description': 10000, 'analysis': 8000, 'logs': 10000, 'diagnostic_commands': 6000, 'troubleshooting': 6000, 'remediation': 6000, 'verification': 6000, 'runbook': 8000, 'timestamp': 100}
-            for key, limit in limits.items():
-                if len(values[key]) > limit:
-                    return response(400, {'error': f"The '{key}' field is too long. Maximum is {limit} characters."})
-            print(f"Executing generate_incident_report: service={values['service']}, severity={values['severity']}, payload_length={len(values['description'])} chars")
-            prompt = build_report_prompt(**values)
-            max_tokens = 4096
-
+            prompt, max_tokens = build_report_prompt(**values), 4096
+        elif action == 'generate_incident_correlation':
+            incident = require_string(body, 'incident', True, 10000)
+            logs = require_string(body, 'logs', False, 12000)
+            diagnostics = require_string(body, 'diagnostics', False, 10000)
+            cli = require_string(body, 'cli', False, 8000)
+            previous = require_string(body, 'previous', False, 8000)
+            runbook = require_string(body, 'runbook', False, 8000)
+            prompt, max_tokens = build_correlation_prompt(incident, logs, diagnostics, cli, previous, runbook), 4096
         else:
-            incident = body.get('incident', '')
-            if not isinstance(incident, str):
-                return response(400, {'error': "The 'incident' field must be a string."})
-            incident = incident.strip()
-            if not incident:
-                return response(400, {'error': "The 'incident' field is required."})
-            if len(incident) > 10000:
-                return response(400, {'error': 'Incident input is too long. Maximum is 10,000 characters.'})
-            print(f'Executing analyze_incident: payload_length={len(incident)} chars')
-            prompt, max_tokens = build_prompt(incident), 1200
+            incident = require_string(body, 'incident', True, 10000)
+            prompt, max_tokens = build_prompt(incident), 2048
 
-        result = bedrock.converse(modelId=MODEL_ID, messages=[{'role': 'user', 'content': [{'text': prompt}]}], inferenceConfig={'maxTokens': max_tokens, 'temperature': 0.1})
-        text = result['output']['message']['content'][0]['text']
-        analysis = extract_json(text)
+        print(f'Executing {action or "incident"}: payload_length={len(prompt)} chars')
+        result = call_bedrock(prompt, max_tokens)
 
-        if action == 'generate_cli' and isinstance(analysis, dict):
-            analysis['commands'] = sanitize_cli_commands(analysis.get('commands', []))
-            analysis.setdefault('service', service)
-            analysis.setdefault('safety_note', 'These commands are intended for read-only diagnostics. Review commands before running them in your AWS environment.')
-        elif action == 'generate_runbook' and isinstance(analysis, dict):
-            analysis['diagnostic_commands'] = sanitize_runbook_commands(analysis.get('diagnostic_commands', []))
-            analysis.setdefault('runbook_title', title)
-            analysis.setdefault('severity', severity)
-        elif action == 'generate_incident_report' and isinstance(analysis, dict):
-            analysis['diagnostic_commands'] = sanitize_runbook_commands(analysis.get('diagnostic_commands', []))
-            overview = analysis.setdefault('incident_overview', {})
-            if isinstance(overview, dict):
-                overview.setdefault('title', values['title'])
-                overview.setdefault('service', values['service'])
-                overview.setdefault('severity', values['severity'])
-                overview.setdefault('timestamp', values['timestamp'] or 'Information not provided.')
-                overview.setdefault('status', 'Information not provided.')
-            analysis.setdefault('root_cause', {'confirmed': [], 'probable': [], 'unknown': ['Information not provided.']})
-            analysis.setdefault('remediation', {'immediate': [], 'long_term': []})
-            analysis.setdefault('post_incident_checklist', [])
+        if action == 'analyze_logs':
+            result['aws_commands'] = sanitize_cli_commands(result.get('aws_commands', []))
+        elif action == 'generate_cli':
+            result['commands'] = sanitize_cli_commands(result.get('commands', []))
+        elif action == 'generate_runbook':
+            result['diagnostic_commands'] = sanitize_runbook_commands(result.get('diagnostic_commands', []))
+        elif action == 'generate_incident_report':
+            result['diagnostic_commands'] = sanitize_runbook_commands(result.get('diagnostic_commands', []))
+        elif action == 'generate_incident_correlation':
+            result['safe_cli_commands'] = sanitize_correlation_commands(result.get('safe_cli_commands', []))
+        else:
+            result['aws_commands'] = sanitize_cli_commands(result.get('aws_commands', []))
 
-        return response(200, analysis)
-
-    except json.JSONDecodeError:
-        return response(502, {'error': 'Bedrock returned an invalid JSON response.'})
+        return response(200, result)
+    except ValueError as exc:
+        return response(400, {'error': str(exc)})
     except Exception as exc:
-        print(f'Unexpected error: {type(exc).__name__}: {exc}')
-        return response(500, {'error': 'Unable to analyze the incident.'})
+        print(f'Unhandled error: {type(exc).__name__}: {exc}')
+        return response(500, {'error': 'Unable to analyze the request right now. Please try again.'})
