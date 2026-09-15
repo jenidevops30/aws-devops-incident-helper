@@ -11,7 +11,12 @@ export default function HistoryPage({ onNavigate }) {
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
   const loadHistory = () => setIncidents(searchQuery.trim() ? searchHistory(searchQuery) : getHistory());
-  useEffect(() => { loadHistory(); }, [searchQuery]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIncidents(searchQuery.trim() ? searchHistory(searchQuery) : getHistory());
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const handleDelete = (e, id) => {
     e.stopPropagation(); deleteIncident(id);

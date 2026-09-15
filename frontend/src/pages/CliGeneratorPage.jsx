@@ -69,10 +69,13 @@ export default function CliGeneratorPage({ onNavigate, initialFormState = null }
   // Sync if initialFormState changes
   useEffect(() => {
     if (initialFormState) {
-      if (initialFormState.service) setService(initialFormState.service);
-      if (initialFormState.incident) setIncident(initialFormState.incident);
-      if (initialFormState.resource_name) setResourceName(initialFormState.resource_name);
-      if (initialFormState.region) setRegion(initialFormState.region);
+      const timer = setTimeout(() => {
+        if (initialFormState.service) setService(initialFormState.service);
+        if (initialFormState.incident) setIncident(initialFormState.incident);
+        if (initialFormState.resource_name) setResourceName(initialFormState.resource_name);
+        if (initialFormState.region) setRegion(initialFormState.region);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [initialFormState]);
 

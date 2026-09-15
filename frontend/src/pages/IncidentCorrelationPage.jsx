@@ -46,7 +46,7 @@ export default function IncidentCorrelationPage({ onNavigate, initialData }) {
       if (!response.ok) throw new Error(`API returned HTTP ${response.status}`);
       let data = await response.json();
       if (data && typeof data.body === 'string') {
-        try { data = JSON.parse(data.body); } catch (_) { /* API returned an object already */ }
+        try { data = JSON.parse(data.body); } catch (e) { /* API returned an object already */ }
       }
       if (!data || (!data.summary && !data.severity && !data.confirmed_findings && !data.probable_findings)) {
         throw new Error('Malformed correlation response');

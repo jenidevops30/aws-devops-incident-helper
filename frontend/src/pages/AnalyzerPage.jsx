@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import IncidentInput from '../components/IncidentInput';
 import IncidentAnalysis from '../components/IncidentAnalysis';
 import LogAnalysis from '../components/LogAnalysis';

@@ -3,11 +3,10 @@ import { getHistory } from '../utils/historyStorage';
 
 export default function Navbar({ onNavigate, currentRoute = '/' }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [historyCount, setHistoryCount] = useState(0);
+  const [historyCount, setHistoryCount] = useState(() => getHistory().length);
 
-  const updateCount = () => setHistoryCount(getHistory().length);
   useEffect(() => {
-    updateCount();
+    const updateCount = () => setHistoryCount(getHistory().length);
     window.addEventListener('incident_history_updated', updateCount);
     window.addEventListener('storage', updateCount);
     return () => { window.removeEventListener('incident_history_updated', updateCount); window.removeEventListener('storage', updateCount); };

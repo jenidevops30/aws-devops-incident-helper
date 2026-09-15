@@ -26,11 +26,6 @@ function Items({ items, numbered = false }) {
   );
 }
 
-function commandsToText(commands) {
-  if (!Array.isArray(commands)) return '';
-  return commands.map((item) => typeof item === 'string' ? item : item?.command).filter(Boolean).join('\n');
-}
-
 function runbookToMarkdown(runbook) {
   const list = (items) => Array.isArray(items) && items.length ? items.map((x, i) => `${i + 1}. ${x}`).join('\n') : '_None provided._';
   return `# ${runbook.runbook_title || 'AWS Incident Runbook'}\n\n` +
