@@ -78,6 +78,46 @@ Troubleshooting Notes: {troubleshooting_notes}
 If information is missing, say what should be checked instead of inventing facts.'''
 
 
+def build_report_prompt(title, service, severity, description, analysis, logs, commands, troubleshooting, remediation, verification, runbook, timestamp):
+    return f'''You are a senior AWS DevOps incident-response report writer.
+Create a professional incident report using ONLY the operator-supplied information below.
+Never claim access to AWS accounts or systems. Never invent account IDs, ARNs, resource names, timestamps, metrics, logs, impact, or confirmed root causes.
+Clearly distinguish observed evidence from AI recommendations. A root cause is CONFIRMED only when the supplied evidence supports it; otherwise put it under probable or unknown.
+Diagnostic commands must be READ-ONLY. Never include destructive or state-changing commands. Never include credentials, secrets, access keys, or tokens.
+For missing information, use exactly "Information not provided." rather than guessing.
+
+Return ONLY valid JSON with exactly this schema:
+{{
+  "incident_overview": {{"title":"...","service":"...","severity":"Unknown|Low|Medium|High|Critical","timestamp":"...","status":"..."}},
+  "executive_summary":"...",
+  "impact":["..."],
+  "symptoms":["..."],
+  "evidence":["..."],
+  "root_cause": {{"confirmed":["..."],"probable":["..."],"unknown":["..."]}},
+  "troubleshooting":["..."],
+  "diagnostic_commands":[{{"command":"aws ...","description":"...","purpose":"...","risk":"READ_ONLY"}}],
+  "remediation": {{"immediate":["..."],"long_term":["..."]}},
+  "verification":["..."],
+  "rollback":["..."],
+  "prevention":["..."],
+  "post_incident_checklist":["Incident resolved","Root cause confirmed","Monitoring verified","Alerts verified","Logs reviewed","Documentation updated","Runbook updated","Preventive action identified"]
+}}
+
+Incident Title: {title}
+AWS Service: {service}
+Severity: {severity}
+Date/Time supplied by operator: {timestamp}
+Incident Description: {description}
+Incident Analysis: {analysis}
+Logs / Evidence: {logs}
+Diagnostic Commands: {commands}
+Troubleshooting Steps: {troubleshooting}
+Remediation: {remediation}
+Verification Results: {verification}
+Runbook: {runbook}
+'''
+
+
 def sanitize_cli_commands(commands):
     safe = []
     if not isinstance(commands, list):
@@ -223,6 +263,26 @@ def lambda_handler(event, context):
             prompt = build_runbook_prompt(title, service, severity, description, optional['existing_analysis'], optional['diagnostic_commands'], optional['logs'], optional['troubleshooting_notes'])
             max_tokens = 4096
 
+        elif action == 'generate_incident_report':
+            string_fields = ['title', 'service', 'severity', 'description', 'analysis', 'logs', 'diagnostic_commands', 'troubleshooting', 'remediation', 'verification', 'runbook', 'timestamp']
+            values = {}
+            for key in string_fields:
+                value = body.get(key, '')
+                if not isinstance(value, str):
+                    return response(400, {'error': f"The '{key}' field must be a string."})
+                values[key] = value.strip()
+            if not values['title'] or not values['description']:
+                return response(400, {'error': 'Incident title and incident description are required.'})
+            if values['severity'] not in RUNBOOK_SEVERITIES:
+                return response(400, {'error': 'Invalid severity selected.'})
+            limits = {'title': 160, 'description': 10000, 'analysis': 8000, 'logs': 10000, 'diagnostic_commands': 6000, 'troubleshooting': 6000, 'remediation': 6000, 'verification': 6000, 'runbook': 8000, 'timestamp': 100}
+            for key, limit in limits.items():
+                if len(values[key]) > limit:
+                    return response(400, {'error': f"The '{key}' field is too long. Maximum is {limit} characters."})
+            print(f"Executing generate_incident_report: service={values['service']}, severity={values['severity']}, payload_length={len(values['description'])} chars")
+            prompt = build_report_prompt(**values)
+            max_tokens = 4096
+
         else:
             incident = body.get('incident', '')
             if not isinstance(incident, str):
@@ -247,6 +307,18 @@ def lambda_handler(event, context):
             analysis['diagnostic_commands'] = sanitize_runbook_commands(analysis.get('diagnostic_commands', []))
             analysis.setdefault('runbook_title', title)
             analysis.setdefault('severity', severity)
+        elif action == 'generate_incident_report' and isinstance(analysis, dict):
+            analysis['diagnostic_commands'] = sanitize_runbook_commands(analysis.get('diagnostic_commands', []))
+            overview = analysis.setdefault('incident_overview', {})
+            if isinstance(overview, dict):
+                overview.setdefault('title', values['title'])
+                overview.setdefault('service', values['service'])
+                overview.setdefault('severity', values['severity'])
+                overview.setdefault('timestamp', values['timestamp'] or 'Information not provided.')
+                overview.setdefault('status', 'Information not provided.')
+            analysis.setdefault('root_cause', {'confirmed': [], 'probable': [], 'unknown': ['Information not provided.']})
+            analysis.setdefault('remediation', {'immediate': [], 'long_term': []})
+            analysis.setdefault('post_incident_checklist', [])
 
         return response(200, analysis)
 
