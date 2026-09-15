@@ -1,1 +1,0 @@
-Read-only diagnostics feature metadata. Validation required before merge.
