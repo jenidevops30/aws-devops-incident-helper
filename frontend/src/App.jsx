@@ -4,6 +4,7 @@ import AnalyzerPage from './pages/AnalyzerPage';
 import HistoryPage from './pages/HistoryPage';
 import CliGeneratorPage from './pages/CliGeneratorPage';
 import RunbookGeneratorPage from './pages/RunbookGeneratorPage';
+import IncidentReportPage from './pages/IncidentReportPage';
 
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState(() => {
@@ -13,6 +14,7 @@ export default function App() {
       if (path === '/history') return '/history';
       if (path === '/cli-generator') return '/cli-generator';
       if (path === '/runbook-generator') return '/runbook-generator';
+      if (path === '/incident-report') return '/incident-report';
       return '/';
     }
     return '/';
@@ -21,6 +23,7 @@ export default function App() {
   const [incidentText, setIncidentText] = useState('');
   const [cliInitialState, setCliInitialState] = useState(null);
   const [runbookInitialState, setRunbookInitialState] = useState(null);
+  const [reportInitialData, setReportInitialData] = useState(null);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -29,6 +32,7 @@ export default function App() {
       else if (path === '/history') setCurrentRoute('/history');
       else if (path === '/cli-generator') setCurrentRoute('/cli-generator');
       else if (path === '/runbook-generator') setCurrentRoute('/runbook-generator');
+      else if (path === '/incident-report') setCurrentRoute('/incident-report');
       else setCurrentRoute('/');
     };
     window.addEventListener('popstate', handlePopState);
@@ -39,6 +43,7 @@ export default function App() {
     if (extraState) {
       if (route === '/cli-generator') setCliInitialState(extraState);
       if (route === '/runbook-generator') setRunbookInitialState(extraState);
+      if (route === '/incident-report') setReportInitialData(extraState);
     }
     if (window.location.pathname !== route) window.history.pushState({}, '', route);
     setCurrentRoute(route);
@@ -62,6 +67,8 @@ export default function App() {
         <CliGeneratorPage onNavigate={navigate} initialFormState={cliInitialState} />
       ) : currentRoute === '/runbook-generator' ? (
         <RunbookGeneratorPage onNavigate={navigate} initialFormState={runbookInitialState} />
+      ) : currentRoute === '/incident-report' ? (
+        <IncidentReportPage onNavigate={navigate} initialData={reportInitialData} />
       ) : (
         <LandingPage onNavigate={navigate} onSelectExample={handleSelectExample} currentRoute={currentRoute} />
       )}
