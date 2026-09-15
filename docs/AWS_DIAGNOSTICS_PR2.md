@@ -1,0 +1,1 @@
+AWS Read-Only Diagnostics is ready for review on this feature branch. Run tests/build and configure the required least-privilege Lambda permissions before deployment.
