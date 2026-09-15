@@ -1,0 +1,1 @@
+The AWS Read-Only Diagnostics implementation is complete for review. No deployment or passing test result is claimed until validation is performed.
