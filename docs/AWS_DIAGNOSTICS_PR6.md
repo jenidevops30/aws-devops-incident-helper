@@ -1,0 +1,1 @@
+AWS Read-Only Diagnostics: ready for review; tests/build still require execution.
