@@ -1,133 +1,77 @@
 # AWS DevOps Incident Helper - Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        AWS DevOps Incident Helper                           │
-│                              Architecture                                   │
-└─────────────────────────────────────────────────────────────────────────────┘
+User Browser (React + Vite / AWS Amplify)
+          |
+          | HTTPS POST /analyze
+          v
+Amazon API Gateway (HTTP API)
+          |
+          v
+AWS Lambda (Python 3.11)
+          |
+          +--> analyze incident
+          +--> analyze CloudWatch logs
+          +--> generate CLI diagnostics
+          +--> generate runbook
+          +--> generate incident report
+          |
+          v
+Amazon Bedrock - Nova Lite via APAC Inference Profile
+          |
+          v
+Structured JSON response
+          |
+          v
+Browser UI
+  |       |        |        |
+  v       v        v        v
+Analysis Logs    Runbook  Incident Report
+  |                          |
+  +------> LocalStorage <----+
+                       |
+                       +--> Markdown export
+                       +--> TXT export
+                       +--> Browser print / PDF
+```
 
-    ┌──────────────┐
-    │   User       │
-    │  Browser     │
-    └──────┬───────┘
-           │ HTTPS
-           ▼
-    ┌──────────────────────────────────────────────────────────────────────┐
-    │                     AWS Amplify (Frontend Hosting)                   │
-    │  ┌────────────────────────────────────────────────────────────────┐  │
-    │  │  React + Vite Application                                      │  │
-    │  │  • Incident input textarea                                     │  │
-    │  │  • Example incident buttons                                    │  │
-    │  │  • Analyze button                                              │  │
-    │  │  • Results display (severity, summary, causes, checks, etc.)  │  │
-    │  └────────────────────────────────────────────────────────────────┘  │
-    │  URL: https://main.d2v4zdm3pgizqg.amplifyapp.com                    │
-    └────────────────────────────────────┬─────────────────────────────────┘
-                                         │ POST /analyze
-                                         ▼
-    ┌──────────────────────────────────────────────────────────────────────┐
-    │                    Amazon API Gateway (HTTP API)                     │
-    │  ┌────────────────────────────────────────────────────────────────┐  │
-    │  │  POST /analyze                                                 │  │
-    │  │  • CORS enabled (AllowOrigins: *)                              │  │
-    │  │  • Lambda proxy integration                                    │  │
-    │  │  • Request validation                                          │  │
-    │  └────────────────────────────────────────────────────────────────┘  │
-    │  Endpoint: https://8s5f4an7kb.execute-api.ap-south-1.amazonaws.com  │
-    └────────────────────────────────────┬─────────────────────────────────┘
-                                         │ Lambda Invoke
-                                         ▼
-    ┌──────────────────────────────────────────────────────────────────────┐
-    │                      AWS Lambda (Python 3.11)                        │
-    │  ┌────────────────────────────────────────────────────────────────┐  │
-    │  │  Function: aws-devops-incident-helper                          │  │
-    │  │  Runtime: Python 3.11                                          │  │
-    │  │  Memory: 256 MB                                                │  │
-    │  │  Timeout: 30 seconds                                           │  │
-    │  │  Handler: lambda_function.lambda_handler                       │  │
-    │  │                                                                 │  │
-    │  │  Responsibilities:                                             │  │
-    │  │  • Parse API Gateway request                                   │  │
-    │  │  • Validate user input (length, format, required fields)      │  │
-    │  │  • Construct Bedrock prompt                                    │  │
-    │  │  • Call Amazon Bedrock Converse API                            │  │
-    │  │  • Parse and validate AI response                              │  │
-    │  │  • Return structured JSON                                      │  │
-    │  │  • Handle errors gracefully                                    │  │
-    │  │  • Log to CloudWatch                                           │  │
-    │  └────────────────────────────────────────────────────────────────┘  │
-    │  ARN: arn:aws:lambda:ap-south-1:390151765180:function:aws-devops-incident-helper │
-    └────────────────────────────────────┬─────────────────────────────────┘
-                                         │ bedrock:InvokeModel
-                                         ▼
-    ┌──────────────────────────────────────────────────────────────────────┐
-    │                      Amazon Bedrock (Nova Lite)                      │
-    │  ┌────────────────────────────────────────────────────────────────┐  │
-    │  │  Model: apac.amazon.nova-lite-v1:0 (APAC Inference Profile)   │  │
-    │  │  Region: ap-south-1 (via cross-region inference)              │  │
-    │  │  Max Tokens: 2048                                              │  │
-    │  │  Temperature: 0.1                                              │  │
-    │  │                                                                 │  │
-    │  │  Prompt: AWS DevOps troubleshooting assistant                  │  │
-    │  │  Output: Structured JSON with severity, summary, causes,      │  │
-    │  │          checks, steps, remediation, AWS CLI commands         │  │
-    │  └────────────────────────────────────────────────────────────────┘  │
-    └────────────────────────────────────┬─────────────────────────────────┘
-                                         │
-                                         ▼
-    ┌──────────────────────────────────────────────────────────────────────┐
-    │                    Amazon CloudWatch Logs                            │
-    │  ┌────────────────────────────────────────────────────────────────┐  │
-    │  │  Log Group: /aws/lambda/aws-devops-incident-helper            │  │
-    │  │  • Request/response logging                                    │  │
-    │  │  • Error tracking                                              │  │
-    │  │  • Performance monitoring                                      │  │
-    │  └────────────────────────────────────────────────────────────────┘  │
-    └──────────────────────────────────────────────────────────────────────┘
+## Incident Reporting Flow
 
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              IAM Permissions                                │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ Lambda Execution Role: aws-devops-incident-helper-lambda-role              │
-│                                                                             │
-│ Permissions:                                                                │
-│ • bedrock:InvokeModel on apac.amazon.nova-lite-v1:0 inference profile     │
-│ • bedrock:InvokeModel on foundation models in APAC regions                │
-│ • logs:CreateLogGroup, CreateLogStream, PutLogEvents                      │
-│                                                                             │
-│ Least Privilege: No bedrock:*, no AdministratorAccess                     │
-└─────────────────────────────────────────────────────────────────────────────┘
+```
+Incident Analyzer ─┐
+CloudWatch Logs ───┤
+CLI Generator ─────┼──> Incident Report Generator ──> Review / Export
+Runbook Generator ─┤
+Incident History ──┘
+```
 
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              Data Flow                                      │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  1. User enters incident in React frontend                                 │
-│  2. Frontend sends POST /analyze to API Gateway                            │
-│  3. API Gateway invokes Lambda function                                    │
-│  4. Lambda validates input, builds prompt                                  │
-│  5. Lambda calls Bedrock Converse API                                      │
-│  6. Bedrock returns structured troubleshooting analysis                    │
-│  7. Lambda parses response, returns JSON                                   │
-│  8. API Gateway returns response to frontend                               │
-│  9. Frontend displays analysis                                             │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+## Privacy Boundary
 
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              AWS Services Used                              │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ • AWS Amplify          - Frontend hosting (React + Vite)                   │
-│ • Amazon API Gateway   - HTTP API endpoint (POST /analyze)                 │
-│ • AWS Lambda           - Serverless compute (Python 3.11)                  │
-│ • Amazon Bedrock       - AI inference (Nova Lite via APAC inference profile)│
-│ • Amazon CloudWatch    - Logging and monitoring                            │
-│ • AWS IAM              - Least-privilege permissions                       │
-└─────────────────────────────────────────────────────────────────────────────┘
+- Incident history is stored only in browser localStorage.
+- Report generation does not add a database or server-side report store.
+- The application does not connect directly to the user's AWS account.
+- Generated AWS CLI commands are displayed for review only and are never executed.
+- The report UI renders supplied/generated content as text rather than trusted HTML.
 
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              Region                                         │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ Primary: ap-south-1 (Asia Pacific - Mumbai)                                │
-│ Bedrock Model: apac.amazon.nova-lite-v1:0 (cross-region inference)        │
-└─────────────────────────────────────────────────────────────────────────────┘
+## Bedrock Report Contract
+
+The `generate_incident_report` action returns:
+
+- `incident_overview`
+- `executive_summary`
+- `impact`
+- `symptoms`
+- `evidence`
+- `root_cause.confirmed`
+- `root_cause.probable`
+- `root_cause.unknown`
+- `troubleshooting`
+- `diagnostic_commands`
+- `remediation.immediate`
+- `remediation.long_term`
+- `verification`
+- `rollback`
+- `prevention`
+- `post_incident_checklist`
+
+All diagnostic commands pass through the existing read-only command sanitizer before being returned to the browser.
