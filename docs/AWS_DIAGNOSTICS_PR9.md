@@ -1,1 +1,0 @@
-AWS Read-Only Diagnostics is implemented and requires validation before merge.
