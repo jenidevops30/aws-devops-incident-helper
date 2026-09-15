@@ -15,6 +15,7 @@ AWS Lambda (Python 3.11)
           +--> generate CLI diagnostics
           +--> generate runbook
           +--> generate incident report
+          +--> correlate incident evidence
           |
           v
 Amazon Bedrock - Nova Lite via APAC Inference Profile
@@ -24,15 +25,48 @@ Structured JSON response
           |
           v
 Browser UI
-  |       |        |        |
-  v       v        v        v
-Analysis Logs    Runbook  Incident Report
-  |                          |
-  +------> LocalStorage <----+
+  |       |        |        |        |
+  v       v        v        v        v
+Analysis Logs    Runbook  Report  Correlation
+  |                          |         |
+  +----------> LocalStorage <----------+
                        |
                        +--> Markdown export
                        +--> TXT export
                        +--> Browser print / PDF
+```
+
+## Incident Correlation Flow
+
+```
+Incident Description
+       +
+CloudWatch / Application Logs
+       +
+AWS Diagnostic Evidence
+       +
+CLI Output
+       +
+Previous Incident Context
+       +
+Runbook / Troubleshooting Context
+       |
+       v
+Evidence-Aware Correlation
+       |
+       +--> Confirmed findings
+       +--> Probable findings
+       +--> Possible findings
+       +--> Unknowns
+       +--> Recommended checks
+       +--> Safe diagnostic commands
+       +--> Next actions
+       |
+       v
+Incident Report Generator
+       |
+       v
+Review / Export
 ```
 
 ## Incident Reporting Flow
@@ -42,16 +76,36 @@ Incident Analyzer ─┐
 CloudWatch Logs ───┤
 CLI Generator ─────┼──> Incident Report Generator ──> Review / Export
 Runbook Generator ─┤
-Incident History ──┘
+Incident History ──┤
+Incident Correlation ┘
 ```
 
 ## Privacy Boundary
 
 - Incident history is stored only in browser localStorage.
-- Report generation does not add a database or server-side report store.
+- Report and correlation generation do not add a database or server-side incident store.
 - The application does not connect directly to the user's AWS account.
 - Generated AWS CLI commands are displayed for review only and are never executed.
-- The report UI renders supplied/generated content as text rather than trusted HTML.
+- The correlation engine analyzes only operator-supplied evidence and must not claim unsupported root-cause certainty.
+- The report and correlation UIs render content as text rather than trusted HTML.
+
+## Bedrock Correlation Contract
+
+The `generate_incident_correlation` action returns:
+
+- `summary`
+- `severity`
+- `evidence_relationships`
+- `confirmed_findings`
+- `probable_findings`
+- `possible_findings`
+- `unknowns`
+- `recommended_checks`
+- `troubleshooting_steps`
+- `safe_cli_commands`
+- `next_actions`
+
+All correlation diagnostic commands pass through the read-only command sanitizer before being returned to the browser.
 
 ## Bedrock Report Contract
 
