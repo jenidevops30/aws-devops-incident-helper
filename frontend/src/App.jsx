@@ -5,6 +5,7 @@ import HistoryPage from './pages/HistoryPage';
 import CliGeneratorPage from './pages/CliGeneratorPage';
 import RunbookGeneratorPage from './pages/RunbookGeneratorPage';
 import IncidentReportPage from './pages/IncidentReportPage';
+import IncidentCorrelationPage from './pages/IncidentCorrelationPage';
 
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState(() => {
@@ -15,6 +16,7 @@ export default function App() {
       if (path === '/cli-generator') return '/cli-generator';
       if (path === '/runbook-generator') return '/runbook-generator';
       if (path === '/incident-report') return '/incident-report';
+      if (path === '/incident-correlation') return '/incident-correlation';
       return '/';
     }
     return '/';
@@ -24,6 +26,7 @@ export default function App() {
   const [cliInitialState, setCliInitialState] = useState(null);
   const [runbookInitialState, setRunbookInitialState] = useState(null);
   const [reportInitialData, setReportInitialData] = useState(null);
+  const [correlationInitialData, setCorrelationInitialData] = useState(null);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -33,6 +36,7 @@ export default function App() {
       else if (path === '/cli-generator') setCurrentRoute('/cli-generator');
       else if (path === '/runbook-generator') setCurrentRoute('/runbook-generator');
       else if (path === '/incident-report') setCurrentRoute('/incident-report');
+      else if (path === '/incident-correlation') setCurrentRoute('/incident-correlation');
       else setCurrentRoute('/');
     };
     window.addEventListener('popstate', handlePopState);
@@ -44,6 +48,7 @@ export default function App() {
       if (route === '/cli-generator') setCliInitialState(extraState);
       if (route === '/runbook-generator') setRunbookInitialState(extraState);
       if (route === '/incident-report') setReportInitialData(extraState);
+      if (route === '/incident-correlation') setCorrelationInitialData(extraState);
     }
     if (window.location.pathname !== route) window.history.pushState({}, '', route);
     setCurrentRoute(route);
@@ -69,6 +74,8 @@ export default function App() {
         <RunbookGeneratorPage onNavigate={navigate} initialFormState={runbookInitialState} />
       ) : currentRoute === '/incident-report' ? (
         <IncidentReportPage onNavigate={navigate} initialData={reportInitialData} />
+      ) : currentRoute === '/incident-correlation' ? (
+        <IncidentCorrelationPage onNavigate={navigate} initialData={correlationInitialData} />
       ) : (
         <LandingPage onNavigate={navigate} onSelectExample={handleSelectExample} currentRoute={currentRoute} />
       )}
