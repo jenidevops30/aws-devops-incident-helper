@@ -14,6 +14,7 @@ export default function Navbar({ onNavigate, currentRoute = '/' }) {
       <button className={`nav-link ${currentRoute === '/' ? 'active' : ''}`} onClick={(e) => handleNav(e, '/', 'top')}>Home</button>
       <button className={`nav-link ${currentRoute === '/analyze' ? 'active' : ''}`} onClick={(e) => handleNav(e, '/analyze')}>Analyzer</button>
       <button className={`nav-link ${currentRoute === '/investigation' ? 'active' : ''}`} onClick={(e) => handleNav(e, '/investigation')}>Investigation</button>
+      <button className={`nav-link ${currentRoute === '/aws-diagnostics' ? 'active' : ''}`} onClick={(e) => handleNav(e, '/aws-diagnostics')}>AWS Diagnostics</button>
       <button className={`nav-link ${currentRoute === '/history' ? 'active' : ''}`} onClick={(e) => handleNav(e, '/history')}><span>History</span>{historyCount > 0 ? <span className="navbar-history-badge">{historyCount}</span> : null}</button>
       <button className={`nav-link ${currentRoute === '/cli-generator' ? 'active' : ''}`} onClick={(e) => handleNav(e, '/cli-generator')}>CLI Generator</button>
       <button className={`nav-link ${currentRoute === '/runbook-generator' ? 'active' : ''}`} onClick={(e) => handleNav(e, '/runbook-generator')}>Runbook</button>
