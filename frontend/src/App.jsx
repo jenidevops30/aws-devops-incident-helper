@@ -4,6 +4,7 @@ import AnalyzerPage from './pages/AnalyzerPage';
 import HistoryPage from './pages/HistoryPage';
 import CliGeneratorPage from './pages/CliGeneratorPage';
 import RunbookGeneratorPage from './pages/RunbookGeneratorPage';
+import InvestigationWorkspacePage from './pages/InvestigationWorkspacePage';
 
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState(() => {
@@ -13,6 +14,7 @@ export default function App() {
       if (path === '/history') return '/history';
       if (path === '/cli-generator') return '/cli-generator';
       if (path === '/runbook-generator') return '/runbook-generator';
+      if (path === '/investigation') return '/investigation';
       return '/';
     }
     return '/';
@@ -29,6 +31,7 @@ export default function App() {
       else if (path === '/history') setCurrentRoute('/history');
       else if (path === '/cli-generator') setCurrentRoute('/cli-generator');
       else if (path === '/runbook-generator') setCurrentRoute('/runbook-generator');
+      else if (path === '/investigation') setCurrentRoute('/investigation');
       else setCurrentRoute('/');
     };
     window.addEventListener('popstate', handlePopState);
@@ -52,19 +55,12 @@ export default function App() {
 
   const handleSelectExample = (text) => { setIncidentText(text); navigate('/analyze'); };
 
-  return (
-    <div className="app-root">
-      {currentRoute === '/analyze' ? (
-        <AnalyzerPage incidentText={incidentText} onIncidentTextChange={setIncidentText} onNavigate={navigate} />
-      ) : currentRoute === '/history' ? (
-        <HistoryPage onNavigate={navigate} />
-      ) : currentRoute === '/cli-generator' ? (
-        <CliGeneratorPage onNavigate={navigate} initialFormState={cliInitialState} />
-      ) : currentRoute === '/runbook-generator' ? (
-        <RunbookGeneratorPage onNavigate={navigate} initialFormState={runbookInitialState} />
-      ) : (
-        <LandingPage onNavigate={navigate} onSelectExample={handleSelectExample} currentRoute={currentRoute} />
-      )}
-    </div>
-  );
+  return <div className="app-root">
+    {currentRoute === '/analyze' ? <AnalyzerPage incidentText={incidentText} onIncidentTextChange={setIncidentText} onNavigate={navigate} />
+      : currentRoute === '/history' ? <HistoryPage onNavigate={navigate} />
+      : currentRoute === '/cli-generator' ? <CliGeneratorPage onNavigate={navigate} initialFormState={cliInitialState} />
+      : currentRoute === '/runbook-generator' ? <RunbookGeneratorPage onNavigate={navigate} initialFormState={runbookInitialState} />
+      : currentRoute === '/investigation' ? <InvestigationWorkspacePage onNavigate={navigate} />
+      : <LandingPage onNavigate={navigate} onSelectExample={handleSelectExample} currentRoute={currentRoute} />}
+  </div>;
 }
