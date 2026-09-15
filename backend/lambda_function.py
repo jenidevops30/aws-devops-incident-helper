@@ -100,6 +100,7 @@ def response(status_code, body):
 
 def lambda_handler(event, context):
     if is_options_request(event): return response(200, {'message': 'OK'})
+    action = ''
     try:
         body = event.get('body', event) if isinstance(event, dict) else event
         if isinstance(body, str):
@@ -172,4 +173,6 @@ def lambda_handler(event, context):
         return response(400, {'error': str(exc)})
     except Exception as exc:
         print(f'Unexpected error: {type(exc).__name__}: {exc}')
+        if action == 'analyze_logs':
+            return response(500, {'error': 'Unable to analyze the incident.'})
         return response(500, {'error': 'Unable to complete the requested operation.'})
